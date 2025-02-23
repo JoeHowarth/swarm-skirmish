@@ -1,10 +1,7 @@
 use std::{net::TcpListener, time::Duration};
 
 use serde::{Deserialize, Serialize};
-use swarm_lib::{
-    connection_manager::{Connection, ConnectionError},
-    protocol::Protocol,
-};
+use swarm_lib::protocol::{Connection, ConnectionError, Protocol};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Message {
