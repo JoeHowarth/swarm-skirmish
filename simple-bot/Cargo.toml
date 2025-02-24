@@ -1,0 +1,8 @@
+[package]
+name = "simple-bot"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+swarm-lib = { path = "../swarm-lib" }
+eyre = "0.6"

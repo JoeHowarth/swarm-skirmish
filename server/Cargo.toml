@@ -1,0 +1,14 @@
+[package]
+name = "server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+swarm-lib = { path = "../swarm-lib" }
+bevy = { version = "0.15.0" }
+bevy_ecs_tilemap = "0.15.0"
+image = "0.25.5"
+bevy_pancam = "0.17"
+array2d = "0.3"
+serde = { version = "1.0.215", features = ["derive"] }
+eyre = "0.6"

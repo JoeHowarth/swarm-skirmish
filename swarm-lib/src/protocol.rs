@@ -162,6 +162,7 @@ impl Connection {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct Protocol {
     version: u8,
     max_message_size: u32,
