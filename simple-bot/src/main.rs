@@ -1,6 +1,7 @@
 use std::io::stdin;
 
 use eyre::Result;
+use rand::Rng;
 use swarm_lib::{
     bevy_math::UVec2,
     bot_harness::{run_bots, Bot, Rpc},
@@ -11,14 +12,71 @@ use swarm_lib::{
 };
 
 fn main() -> Result<()> {
-    run_bots::<SimpleBot>()
+    run_bots::<RandomWalkBot>()
 }
 
-struct SimpleBot {
+struct RandomWalkBot {
     rpc: Rpc,
 }
 
-impl Bot for SimpleBot {
+impl Bot for RandomWalkBot {
+    fn new(rpc: Rpc) -> Self {
+        Self { rpc }
+    }
+
+    fn run(mut self) -> Result<()> {
+        // Subscribe to position and radar initially
+        let initial_response = BotResponse::builder()
+            .subscribe(SubscriptionType::Position)
+            .subscribe(SubscriptionType::Radar)
+            .build();
+        self.rpc.send_msg(initial_response);
+
+        let mut rng = rand::thread_rng();
+
+        loop {
+            // Wait for server update
+            let update = self.rpc.wait_for_latest_update();
+
+            // Occasionally print debug info
+            if update.response.tick % 1 == 0 {
+                println!("RandomWalkBot: tick={}", update.response.tick);
+
+                if let Some(pos) = &update.response.position {
+                    println!("Current position: {:?}", pos);
+                }
+
+                if let Some(radar) = &update.response.radar {
+                    println!("Radar shows bots: {:?}", radar.bots);
+                    self.rpc.print_radar(&update);
+                }
+            }
+
+            // Choose a random direction to move
+            let direction = match rng.gen_range(0..4) {
+                0 => Dir::Up,
+                1 => Dir::Down,
+                2 => Dir::Left,
+                3 => Dir::Right,
+                _ => unreachable!(),
+            };
+            // let direction = Dir::Right;
+
+            // Build and send response with random movement
+            let response = BotResponse::builder()
+                .push_action(Action::MoveDir(direction))
+                .build();
+
+            self.rpc.send_msg(response);
+        }
+    }
+}
+
+struct TerminalControlledBot {
+    rpc: Rpc,
+}
+
+impl Bot for TerminalControlledBot {
     fn new(rpc: Rpc) -> Self {
         Self { rpc }
     }

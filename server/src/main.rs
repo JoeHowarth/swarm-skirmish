@@ -126,7 +126,7 @@ fn send_server_updates(
                 radar: subscriptions
                     .0
                     .get(&SubscriptionType::Radar)
-                    .map(|_| creat_radar_data(pos, &grid_world, &query)),
+                    .map(|_| create_radar_data(pos, &grid_world, &query)),
             },
         };
 
@@ -134,32 +134,44 @@ fn send_server_updates(
     }
 }
 
-fn creat_radar_data(
+fn create_radar_data(
     pos: &Pos,
     grid_world: &GridWorld,
     query: &Query<(&BotId, &Pos, &Team, &Subscriptions)>,
 ) -> RadarData {
     // Create a radar with a 10x10 grid centered on the bot
+    let radar_size = 10;
+    let radar_center = radar_size / 2; // Center point (5 for a 10x10 grid)
+
     let mut radar = RadarData {
         bots: Vec::new(),
-        cells: Array2D::filled_with(CellStateRadar::Empty, 10, 10),
+        cells: Array2D::filled_with(
+            CellStateRadar::Unknown,
+            radar_size,
+            radar_size,
+        ),
     };
 
-    // Calculate the offset to center the radar on the bot
-    let radar_radius = 5; // Half of the 10x10 grid
-    let bot_x = pos.0.x as usize;
-    let bot_y = pos.0.y as usize;
-    let min_x = bot_x.saturating_sub(radar_radius);
-    let min_y = bot_y.saturating_sub(radar_radius);
+    // Get bot's world coordinates
+    let bot_world_x = pos.0.x as isize;
+    let bot_world_y = pos.0.y as isize;
 
-    grid_world.nearby(bot_x, bot_y, 5).for_each(
-        |((world_x, world_y), cell)| {
-            // Convert world coordinates to radar coordinates
-            let radar_x = world_x.saturating_sub(min_x);
-            let radar_y = world_y.saturating_sub(min_y);
+    // Use nearby to get cells in radar range with Manhattan distance
+    grid_world
+        .nearby(bot_world_x as usize, bot_world_y as usize, radar_center)
+        .for_each(|((world_x, world_y), cell)| {
+            // Calculate radar coordinates (relative to bot at center)
+            let world_x = world_x as isize;
+            let world_y = world_y as isize;
+
+            let dx = world_x - bot_world_x;
+            let dy = world_y - bot_world_y;
+
+            let radar_x = (radar_center as isize + dx) as usize;
+            let radar_y = (radar_center as isize + dy) as usize;
 
             // Skip if outside radar bounds
-            if radar_x >= 10 || radar_y >= 10 {
+            if radar_x >= radar_size || radar_y >= radar_size {
                 return;
             }
 
@@ -167,9 +179,19 @@ fn creat_radar_data(
                 CellState::Empty => CellStateRadar::Empty,
                 CellState::Blocked => CellStateRadar::Blocked,
                 CellState::Pawn(entity) => {
+                    // Get the bot's team
+                    let team = match query.get(*entity) {
+                        Ok((_, _, team, _)) => *team,
+                        Err(_) => {
+                            warn!("Entity not found in query: {:?}", entity);
+                            return; // Skip this entity
+                        }
+                    };
+
+                    // Store the bot's position in radar coordinates
                     radar.bots.push(RadarBotData {
-                        team: *query.get(*entity).unwrap().2,
-                        pos: UVec2::new(world_x as u32, world_y as u32),
+                        team,
+                        pos: UVec2::new(radar_x as u32, radar_y as u32),
                     });
 
                     CellStateRadar::Bot {
@@ -177,9 +199,44 @@ fn creat_radar_data(
                     }
                 }
             };
+
             radar.cells.set(radar_x, radar_y, radar_cell).unwrap();
-        },
-    );
+        });
+
+    // Set all cells that would be outside the map bounds to Blocked instead of
+    // Unknown
+    let map_width = grid_world.width() as isize;
+    let map_height = grid_world.height() as isize;
+
+    // Iterate through all radar cells
+    for radar_x in 0..radar_size {
+        for radar_y in 0..radar_size {
+            // Calculate the corresponding world coordinates
+            let world_x =
+                bot_world_x + (radar_x as isize - radar_center as isize);
+            let world_y =
+                bot_world_y + (radar_y as isize - radar_center as isize);
+
+            // Check if the world coordinates are outside the map bounds
+            if world_x < 0
+                || world_x >= map_width
+                || world_y < 0
+                || world_y >= map_height
+            {
+                // If the cell is still Unknown (i.e., it wasn't filled by a
+                // valid map cell), mark it as Blocked
+                if let CellStateRadar::Unknown =
+                    radar.cells.get(radar_x, radar_y).unwrap()
+                {
+                    radar
+                        .cells
+                        .set(radar_x, radar_y, CellStateRadar::Blocked)
+                        .unwrap();
+                }
+            }
+        }
+    }
+
     radar
 }
 
@@ -308,6 +365,7 @@ fn init_map(mut commands: Commands) {
 
 fn handle_movement(
     mut move_events: EventReader<MoveEvent>,
+    mut positions: Query<&mut Pos>,
     mut grid_world: ResMut<GridWorld>,
 ) {
     for event in move_events.read() {
@@ -338,6 +396,8 @@ fn handle_movement(
                 if grid_world.get(new_x, new_y) == CellState::Empty {
                     grid_world.set(x, y, CellState::Empty);
                     grid_world.set(new_x, new_y, CellState::Pawn(event.entity));
+                    positions.get_mut(event.entity).unwrap().0 =
+                        UVec2::new(new_x as u32, new_y as u32);
                 }
             }
         }

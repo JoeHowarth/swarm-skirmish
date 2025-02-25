@@ -3,7 +3,7 @@ use std::{
     io::{BufReader, BufWriter},
     net::TcpStream,
     process::exit,
-    sync::mpsc::{self, Receiver, Sender},
+    sync::mpsc::{self, Receiver, Sender}, thread::sleep, time::Duration,
 };
 
 use eyre::Result;
@@ -28,14 +28,16 @@ pub fn print_radar(radar: &RadarData) {
     // Print top border
     println!("┌{}┐", "─".repeat(width * 2));
 
-    // Print radar grid
+    // Print radar grid - FIXING coordinates: iterate y first, then x
     for y in 0..height {
         print!("│");
         for x in 0..width {
-            let cell = radar.cells.get(x, y).unwrap();
+            // Get cell at (x,y) - not (y,x)
+            let cell = radar.cells.get(x, height - y - 1).unwrap();
             match cell {
+                CellStateRadar::Unknown => print!(". "),
                 CellStateRadar::Empty => print!("  "),
-                CellStateRadar::Blocked => print!("XX"),
+                CellStateRadar::Blocked => print!("[]"),
                 CellStateRadar::Bot { idx } => {
                     let bot = &radar.bots[*idx];
                     match bot.team {
@@ -141,7 +143,15 @@ pub trait Bot {
 }
 
 pub fn run_bots<B: Bot + Send + 'static>() -> Result<()> {
-    let writer = TcpStream::connect("127.0.0.1:1234")?;
+    let writer;
+    loop {
+        if let Ok(writer_ok) = TcpStream::connect("127.0.0.1:1234") {
+            writer = writer_ok;
+            break;
+        }
+        sleep(Duration::from_millis(100));
+    }
+
     let mut reader = BufReader::new(writer.try_clone()?);
     let mut writer = BufWriter::new(writer);
 

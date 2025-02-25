@@ -15,6 +15,7 @@ pub struct RadarBotData {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CellStateRadar {
+    Unknown,
     Empty,
     Blocked,
     Bot { idx: usize },

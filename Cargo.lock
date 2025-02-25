@@ -4021,6 +4021,7 @@ name = "simple-bot"
 version = "0.1.0"
 dependencies = [
  "eyre",
+ "rand",
  "swarm-lib",
 ]
 
