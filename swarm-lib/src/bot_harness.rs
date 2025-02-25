@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    io::{BufReader, BufWriter, Write},
+    io::{BufReader, BufWriter},
     net::TcpStream,
     process::exit,
     sync::mpsc::{self, Receiver, Sender},
@@ -10,19 +10,133 @@ use eyre::Result;
 
 use crate::{
     protocol::Protocol,
-    BotMsg,
     BotMsgEnvelope,
+    BotResponse,
+    CellStateRadar,
     ClientMsg,
-    ResponseEnvelope,
+    RadarData,
     ServerMsg,
+    ServerUpdateEnvelope,
+    Team,
 };
 
-pub trait Bot {
-    fn new(
+/// Prints a visual representation of radar data to the terminal
+pub fn print_radar(radar: &RadarData) {
+    let width = radar.cells.num_columns();
+    let height = radar.cells.num_rows();
+
+    // Print top border
+    println!("┌{}┐", "─".repeat(width * 2));
+
+    // Print radar grid
+    for y in 0..height {
+        print!("│");
+        for x in 0..width {
+            let cell = radar.cells.get(x, y).unwrap();
+            match cell {
+                CellStateRadar::Empty => print!("  "),
+                CellStateRadar::Blocked => print!("XX"),
+                CellStateRadar::Bot { idx } => {
+                    let bot = &radar.bots[*idx];
+                    match bot.team {
+                        Team::Player => print!("P "),
+                        Team::Enemy => print!("E "),
+                    }
+                }
+            }
+        }
+        println!("│");
+    }
+
+    // Print bottom border
+    println!("└{}┘", "─".repeat(width * 2));
+
+    // Print bot information
+    if !radar.bots.is_empty() {
+        println!("\nBots detected:");
+        for (i, bot) in radar.bots.iter().enumerate() {
+            println!(
+                "  {}: {:?} at position ({}, {})",
+                i, bot.team, bot.pos.x, bot.pos.y
+            );
+        }
+    }
+}
+
+pub struct Rpc {
+    pub bot_id: u32,
+    pub seq: u32,
+    pub resp_rx: Receiver<ServerUpdateEnvelope>,
+    pub bot_msg_tx: Sender<BotMsgEnvelope>,
+}
+
+impl Rpc {
+    pub fn new(
         bot_id: u32,
-        resp_rx: Receiver<ResponseEnvelope>,
+        resp_rx: Receiver<ServerUpdateEnvelope>,
         bot_msg_tx: Sender<BotMsgEnvelope>,
-    ) -> Self;
+    ) -> Self {
+        Rpc {
+            bot_id,
+            seq: 0,
+            resp_rx,
+            bot_msg_tx,
+        }
+    }
+
+    pub fn wait_for_latest_update(&mut self) -> ServerUpdateEnvelope {
+        let mut update = self
+            .resp_rx
+            .recv()
+            .expect("Failed to receive server update");
+
+        // drain the channel
+        while let Ok(new_update) = self.resp_rx.try_recv() {
+            update = new_update;
+        }
+        update
+    }
+
+    pub fn wait_for_update(&mut self) -> ServerUpdateEnvelope {
+        self.resp_rx
+            .recv()
+            .expect("Failed to receive server update")
+    }
+
+    pub fn send_msg(&mut self, bot_msg: BotResponse) {
+        let envelope = BotMsgEnvelope {
+            bot_id: self.bot_id,
+            seq: self.seq,
+            msg: bot_msg,
+        };
+
+        // Increment sequence number for next message
+        self.seq += 1;
+
+        self.bot_msg_tx
+            .send(envelope)
+            .expect("Failed to send bot message");
+    }
+
+    /// Prints the radar data to the terminal if available in the server update
+    pub fn print_radar(&self, update: &ServerUpdateEnvelope) {
+        if let Some(radar) = &update.response.radar {
+            println!(
+                "Radar for Bot {} (Tick {}):",
+                self.bot_id, update.response.tick
+            );
+            print_radar(radar);
+        } else {
+            println!(
+                "No radar data available. Make sure to subscribe to radar \
+                 updates."
+            );
+        }
+    }
+}
+
+pub trait Bot {
+    fn new(rpc: Rpc) -> Self;
     fn run(self) -> Result<()>;
 }
 
@@ -36,7 +150,7 @@ pub fn run_bots<B: Bot + Send + 'static>() -> Result<()> {
     std::thread::spawn(move || {
         let protocol = Protocol::new();
         let mut response_channel_map =
-            HashMap::<u32, Sender<ResponseEnvelope>>::new();
+            HashMap::<u32, Sender<ServerUpdateEnvelope>>::new();
 
         loop {
             let msg: ServerMsg = protocol.read_message(&mut reader).unwrap();
@@ -51,22 +165,23 @@ pub fn run_bots<B: Bot + Send + 'static>() -> Result<()> {
                     response_channel_map.insert(bot_id, resp_tx);
 
                     std::thread::spawn(move || {
-                        let bot = B::new(bot_id, resp_rx, bot_msg_tx);
+                        let rpc = Rpc::new(bot_id, resp_rx, bot_msg_tx);
+                        let bot = B::new(rpc);
                         if let Err(e) = bot.run() {
                             eprintln!("Bot {} error: {:?}", bot_id, e);
                         }
                     });
                 }
-                ServerMsg::Response(response_envelope) => {
+                ServerMsg::ServerUpdate(server_update_envelope) => {
                     // Find the correct response channel for this bot
                     let resp_tx = response_channel_map
-                        .get(&response_envelope.bot_id)
+                        .get(&server_update_envelope.bot_id)
                         .unwrap();
 
                     // Forward the response to the bot
                     resp_tx
-                        .send(response_envelope)
-                        .expect("Failed to send response on channel");
+                        .send(server_update_envelope)
+                        .expect("Failed to send server update on channel");
                 }
                 ServerMsg::Close => {
                     println!("Received close message, exiting...");

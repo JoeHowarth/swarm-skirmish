@@ -15,6 +15,15 @@ impl GridWorld {
         }
     }
 
+    pub fn find_path(
+        &self,
+        start: impl Into<UVec2>,
+        goal: impl Into<UVec2>,
+    ) -> Option<Vec<UVec2>> {
+        PathFinder::new(self.width(), self.height())
+            .find_path(self, start, goal)
+    }
+
     pub fn get(&self, x: usize, y: usize) -> CellState {
         *self.grid.get(x, y).unwrap()
     }
@@ -105,14 +114,14 @@ impl PathFinder {
         dx + dy
     }
 
-    fn reconstruct_path(&self, current: (usize, usize)) -> Vec<(usize, usize)> {
-        let mut path = vec![current];
+    fn reconstruct_path(&self, current: (usize, usize)) -> Vec<UVec2> {
+        let mut path = vec![UVec2::from((current.0 as u32, current.1 as u32))];
         let mut current = current;
 
         while let Some(pos) = self.came_from.get(current.0, current.1).unwrap()
         {
             current = *pos;
-            path.push(current);
+            path.push(UVec2::from((current.0 as u32, current.1 as u32)));
         }
 
         path.reverse();
@@ -122,13 +131,17 @@ impl PathFinder {
     pub fn find_path(
         &mut self,
         grid: &GridWorld,
-        start: (usize, usize),
-        goal: (usize, usize),
-    ) -> Option<Vec<(usize, usize)>> {
+        start: impl Into<UVec2>,
+        goal: impl Into<UVec2>,
+    ) -> Option<Vec<UVec2>> {
         use std::{
             cmp::Ordering,
             collections::{BinaryHeap, HashSet},
         };
+        let start: UVec2 = start.into();
+        let goal: UVec2 = goal.into();
+        let start = (start.x as usize, start.y as usize);
+        let goal = (goal.x as usize, goal.y as usize);
 
         #[derive(Eq, PartialEq)]
         struct Node {

@@ -7,58 +7,60 @@ use std::{
     },
 };
 
-use bevy::prelude::*;
+use bevy::{prelude::*, utils::HashMap};
 use eyre::{bail, Result};
 use swarm_lib::{
-    bot_harness::Bot,
     protocol::{Connection, Protocol},
     Action,
-    BotMsg,
     BotMsgEnvelope,
+    BotResponse,
     ClientMsg,
-    QueryEnvelope,
-    ResponseEnvelope,
     ServerMsg,
+    ServerUpdate,
+    ServerUpdateEnvelope,
     Team,
 };
+
+use crate::BotId;
 
 pub struct BotHandlerPlugin;
 
 impl Plugin for BotHandlerPlugin {
     fn build(&self, app: &mut App) {
         let (new_bots_tx, new_bots_rx) = mpmc::channel();
-        app.insert_resource(NewBots(new_bots_tx));
-
-        let (bot_resp_tx, bot_resp_rx) = mpmc::channel();
-        app.insert_resource(BotResponses(bot_resp_tx));
-
+        let (server_update_tx, server_update_rx) = mpmc::channel();
         let (action_tx, action_rx) = mpmc::channel();
-        app.insert_resource(ActionRecv(action_rx));
+        let (subscription_tx, subscription_rx) = mpmc::channel();
 
-        let (query_tx, query_rx) = mpmc::channel();
-        app.insert_resource(QueryRecv(query_rx));
+        app.init_resource::<BotIdToEntity>()
+            .insert_resource(NewBots(new_bots_tx))
+            .insert_resource(ServerUpdates(server_update_tx))
+            .insert_resource(ActionRecv(action_rx))
+            .insert_resource(SubscriptionRecv(subscription_rx));
 
         app.add_systems(Update, add_new_bots);
 
         std::thread::spawn(move || {
-            server(new_bots_rx, bot_resp_rx, action_tx, query_tx)
+            server(new_bots_rx, server_update_rx, action_tx, subscription_tx)
         });
     }
 }
 
-#[derive(Component, Debug)]
-pub struct BotId(pub u32);
+#[derive(Resource, Default)]
+pub struct BotIdToEntity(pub HashMap<BotId, Entity>);
 
 fn add_new_bots(
     mut commands: Commands,
     without_id: Query<(Entity, &Team), Without<BotId>>,
     new_bots: Res<NewBots>,
+    mut bot_id_to_entity: ResMut<BotIdToEntity>,
     mut next_id: Local<u32>,
 ) {
     for (entity, _team) in without_id.iter() {
         *next_id += 1;
         let id = BotId(*next_id);
         new_bots.0.send(id.0).unwrap();
+        bot_id_to_entity.0.insert(id, entity);
         commands.entity(entity).insert(id);
         info!("New botId sent to channel");
     }
@@ -68,19 +70,21 @@ fn add_new_bots(
 pub struct NewBots(pub mpmc::Sender<u32>);
 
 #[derive(Resource)]
-pub struct BotResponses(pub mpmc::Sender<ResponseEnvelope>);
+pub struct ServerUpdates(pub mpmc::Sender<ServerUpdateEnvelope>);
 
 #[derive(Resource)]
 pub struct ActionRecv(pub mpmc::Receiver<(BotId, Action)>);
 
 #[derive(Resource)]
-pub struct QueryRecv(pub mpmc::Receiver<(BotId, QueryEnvelope)>);
+pub struct SubscriptionRecv(
+    pub mpmc::Receiver<(BotId, Vec<swarm_lib::SubscriptionType>)>,
+);
 
 fn server(
     new_bots_rx: mpmc::Receiver<u32>,
-    bot_resp_rx: mpmc::Receiver<ResponseEnvelope>,
+    server_update_rx: mpmc::Receiver<ServerUpdateEnvelope>,
     action_tx: mpmc::Sender<(BotId, Action)>,
-    query_tx: mpmc::Sender<(BotId, QueryEnvelope)>,
+    subscription_tx: mpmc::Sender<(BotId, Vec<swarm_lib::SubscriptionType>)>,
 ) {
     let listener = TcpListener::bind("127.0.0.1:1234").unwrap();
 
@@ -88,17 +92,17 @@ fn server(
         let stream = stream.unwrap();
 
         let new_bots_rx = new_bots_rx.clone();
-        let bot_resp_rx = bot_resp_rx.clone();
+        let server_update_rx = server_update_rx.clone();
         let action_tx = action_tx.clone();
-        let query_tx = query_tx.clone();
+        let subscription_tx = subscription_tx.clone();
 
         std::thread::spawn(move || {
             if let Err(e) = handle_connection(
                 stream,
                 new_bots_rx,
-                bot_resp_rx,
+                server_update_rx,
                 action_tx,
-                query_tx,
+                subscription_tx,
             ) {
                 eprintln!("Connection error: {:?}", e);
             }
@@ -109,9 +113,9 @@ fn server(
 fn handle_connection(
     stream: TcpStream,
     new_bots_rx: mpmc::Receiver<u32>,
-    bot_resp_rx: mpmc::Receiver<ResponseEnvelope>,
+    server_update_rx: mpmc::Receiver<ServerUpdateEnvelope>,
     action_tx: mpmc::Sender<(BotId, Action)>,
-    query_tx: mpmc::Sender<(BotId, QueryEnvelope)>,
+    subscription_tx: mpmc::Sender<(BotId, Vec<swarm_lib::SubscriptionType>)>,
 ) -> Result<()> {
     let protocol = Protocol::new();
 
@@ -123,20 +127,35 @@ fn handle_connection(
         bail!("Expected Connect message, got: {connect:?}");
     }
 
+    // Send ConnectAck
+    protocol.write_message(&mut writer, &ServerMsg::ConnectAck)?;
+
     std::thread::spawn(move || {
         let mut reader = reader;
         loop {
             let msg: ClientMsg = protocol.read_message(&mut reader).unwrap();
             match msg {
                 ClientMsg::Connect => error!("Sent 'Connect' msg twice"),
-                ClientMsg::BotMsg(BotMsgEnvelope { bot_id, msg }) => {
-                    match msg {
-                        BotMsg::Action(action) => {
-                            action_tx.send((BotId(bot_id), action)).unwrap()
-                        }
-                        BotMsg::Query(query_envelope) => query_tx
-                            .send((BotId(bot_id), query_envelope))
-                            .unwrap(),
+                ClientMsg::BotMsg(BotMsgEnvelope {
+                    bot_id,
+                    seq: _seq,
+                    msg,
+                }) => {
+                    // Process bot response
+                    for action in msg.actions {
+                        action_tx.send((BotId(bot_id), action)).unwrap();
+                    }
+
+                    // Handle subscriptions
+                    if !msg.subscribe.is_empty() {
+                        subscription_tx
+                            .send((BotId(bot_id), msg.subscribe))
+                            .unwrap();
+                    }
+
+                    // Handle unsubscriptions if needed
+                    if !msg.unsubscribe.is_empty() {
+                        // Add handling for unsubscriptions if needed
                     }
                 }
             }
@@ -151,13 +170,16 @@ fn handle_connection(
                 .unwrap();
         }
 
-        if let Ok(bot_resp) = bot_resp_rx.try_recv() {
+        if let Ok(server_update) = server_update_rx.try_recv() {
             info!(
-                "Sending bot response to bot: {}, query_seq: {}",
-                bot_resp.bot_id, bot_resp.query_seq
+                "Sending server update to bot: {}, seq: {}",
+                server_update.bot_id, server_update.seq
             );
             protocol
-                .write_message(&mut writer, &ServerMsg::Response(bot_resp))
+                .write_message(
+                    &mut writer,
+                    &ServerMsg::ServerUpdate(server_update),
+                )
                 .unwrap();
         }
     }
