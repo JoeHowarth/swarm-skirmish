@@ -1,41 +1,15 @@
-use std::{
-    collections::VecDeque,
-    fmt::Write,
-    net::TcpListener,
-    time::Duration,
-};
+use std::fmt::Write;
 
-use array2d::Array2D;
 use bevy::{
     prelude::*,
-    time::common_conditions::on_timer,
-    utils::{HashMap, HashSet},
+    utils::HashMap,
 };
-use strum_macros::{Display, EnumString};
-use swarm_lib::{
-    Action,
-    BotMsgEnvelope,
-    CellStateRadar,
-    Dir,
-    Item,
-    RadarBotData,
-    RadarData,
-    ServerUpdate,
-    ServerUpdateEnvelope,
-    SubscriptionType,
-    Team,
-};
+use strum_macros::Display;
+use swarm_lib::Item;
 
 use crate::{
     gridworld::GridWorld,
-    server::{
-        ActionRecv,
-        BotHandlerPlugin,
-        BotId,
-        BotIdToEntity,
-        ServerUpdates,
-        SubscriptionRecv,
-    },
+    server::BotId,
 };
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]

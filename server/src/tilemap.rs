@@ -1,7 +1,6 @@
 use bevy::{asset::RenderAssetUsages, prelude::*};
 use bevy_ecs_tilemap::prelude::*;
 use image::DynamicImage;
-use serde::{Deserialize, Serialize};
 use swarm_lib::Team;
 
 use crate::{core::CellKind, gridworld::GridWorld, CellState, Item};

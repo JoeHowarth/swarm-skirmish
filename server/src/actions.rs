@@ -1,21 +1,9 @@
-use std::{collections::VecDeque, net::TcpListener, time::Duration};
+use std::collections::VecDeque;
 
-use array2d::Array2D;
-use bevy::{
-    prelude::*,
-    time::common_conditions::on_timer,
-    utils::{HashMap, HashSet},
-};
+use bevy::prelude::*;
 use swarm_lib::{
     Action,
-    BotMsgEnvelope,
-    CellStateRadar,
     Dir,
-    RadarBotData,
-    RadarData,
-    ServerUpdate,
-    ServerUpdateEnvelope,
-    SubscriptionType,
     Team,
 };
 
@@ -23,13 +11,9 @@ use crate::{
     gridworld::GridWorld,
     server::{
         ActionRecv,
-        BotHandlerPlugin,
         BotId,
         BotIdToEntity,
-        ServerUpdates,
-        SubscriptionRecv,
     },
-    CellState,
     Pos,
 };
 

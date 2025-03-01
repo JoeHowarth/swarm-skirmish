@@ -2,37 +2,22 @@
 #![feature(mpmc_channel)]
 
 use core::{CellState, CorePlugin, CoreSystemsSet, Inventory, PawnKind, Pos};
-use std::{collections::VecDeque, net::TcpListener, time::Duration};
+use std::time::Duration;
 
 use actions::{ActionsPlugin, ActionsSystemSet};
-use array2d::Array2D;
 use bevy::{
     prelude::*,
     time::common_conditions::on_timer,
-    utils::{HashMap, HashSet},
 };
 use gridworld::GridWorld;
 use server::{
-    ActionRecv,
     BotHandlerPlugin,
     BotId,
-    BotIdToEntity,
     ServerSystems,
-    ServerUpdates,
-    SubscriptionRecv,
 };
 use subscriptions::{SubscriptionsPlugin, SubscriptionsSystemSet};
 use swarm_lib::{
-    Action,
-    BotMsgEnvelope,
-    CellStateRadar,
-    Dir,
     Item,
-    RadarBotData,
-    RadarData,
-    ServerUpdate,
-    ServerUpdateEnvelope,
-    SubscriptionType,
     Team,
 };
 use tilemap::TilemapSystemSet;

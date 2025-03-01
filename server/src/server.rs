@@ -1,42 +1,27 @@
 use std::{
-    collections::VecDeque,
     io::{BufReader, BufWriter},
     net::{TcpListener, TcpStream},
-    sync::{
-        mpmc,
-        mpsc::{Receiver, Sender},
-    },
-    time::Duration,
+    sync::mpmc,
 };
 
-use array2d::Array2D;
 use bevy::{
     prelude::*,
-    time::common_conditions::on_timer,
-    utils::{HashMap, HashSet},
+    utils::HashMap,
 };
 use eyre::{bail, Result};
 use swarm_lib::{
     protocol::Protocol,
     Action,
     BotMsgEnvelope,
-    BotResponse,
-    CellStateRadar,
     ClientMsg,
-    Dir,
-    RadarBotData,
-    RadarData,
     ServerMsg,
-    ServerUpdate,
     ServerUpdateEnvelope,
-    SubscriptionType,
     Team,
 };
 
 use crate::{
     actions::ActionQueue,
     core::PawnKind,
-    gridworld::GridWorld,
     subscriptions::Subscriptions,
 };
 
