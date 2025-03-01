@@ -1,29 +1,70 @@
 use std::{
+    collections::VecDeque,
     io::{BufReader, BufWriter},
     net::{TcpListener, TcpStream},
     sync::{
         mpmc,
         mpsc::{Receiver, Sender},
     },
+    time::Duration,
 };
 
-use bevy::{prelude::*, utils::HashMap};
+use array2d::Array2D;
+use bevy::{
+    prelude::*,
+    time::common_conditions::on_timer,
+    utils::{HashMap, HashSet},
+};
 use eyre::{bail, Result};
 use swarm_lib::{
-    protocol::{Connection, Protocol},
+    protocol::Protocol,
     Action,
     BotMsgEnvelope,
     BotResponse,
+    CellStateRadar,
     ClientMsg,
+    Dir,
+    RadarBotData,
+    RadarData,
     ServerMsg,
     ServerUpdate,
     ServerUpdateEnvelope,
+    SubscriptionType,
     Team,
 };
 
-use crate::BotId;
+use crate::{
+    actions::ActionQueue,
+    core::PawnKind,
+    gridworld::GridWorld,
+    subscriptions::Subscriptions,
+};
+
+#[derive(Component, Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[require(ActionQueue, Subscriptions)]
+pub struct BotId(pub u32);
+
+#[derive(Resource)]
+pub struct NewBots(pub mpmc::Sender<(u32, PawnKind)>);
+
+#[derive(Resource)]
+pub struct ServerUpdates(pub mpmc::Sender<ServerUpdateEnvelope>);
+
+#[derive(Resource)]
+pub struct ActionRecv(pub mpmc::Receiver<(BotId, Action)>);
+
+#[derive(Resource)]
+pub struct SubscriptionRecv(
+    pub mpmc::Receiver<(BotId, Vec<swarm_lib::SubscriptionType>)>,
+);
+
+#[derive(Resource, Default)]
+pub struct BotIdToEntity(pub HashMap<BotId, Entity>);
 
 pub struct BotHandlerPlugin;
+
+#[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
+pub struct ServerSystems;
 
 impl Plugin for BotHandlerPlugin {
     fn build(&self, app: &mut App) {
@@ -38,7 +79,7 @@ impl Plugin for BotHandlerPlugin {
             .insert_resource(ActionRecv(action_rx))
             .insert_resource(SubscriptionRecv(subscription_rx));
 
-        app.add_systems(Update, add_new_bots);
+        app.add_systems(Update, add_new_bots.in_set(ServerSystems));
 
         std::thread::spawn(move || {
             server(new_bots_rx, server_update_rx, action_tx, subscription_tx)
@@ -46,42 +87,29 @@ impl Plugin for BotHandlerPlugin {
     }
 }
 
-#[derive(Resource, Default)]
-pub struct BotIdToEntity(pub HashMap<BotId, Entity>);
-
 fn add_new_bots(
     mut commands: Commands,
-    without_id: Query<(Entity, &Team), Without<BotId>>,
+    without_id: Query<(Entity, &Team, &PawnKind), Without<BotId>>,
     new_bots: Res<NewBots>,
     mut bot_id_to_entity: ResMut<BotIdToEntity>,
     mut next_id: Local<u32>,
 ) {
-    for (entity, _team) in without_id.iter() {
+    for (entity, _team, kind) in without_id.iter() {
         *next_id += 1;
         let id = BotId(*next_id);
-        new_bots.0.send(id.0).unwrap();
+
+        // send to server, to send to client to assign bot
+        new_bots.0.send((id.0, *kind)).unwrap();
+
+        // Add bot_id
         bot_id_to_entity.0.insert(id, entity);
         commands.entity(entity).insert(id);
         info!("New botId sent to channel");
     }
 }
 
-#[derive(Resource)]
-pub struct NewBots(pub mpmc::Sender<u32>);
-
-#[derive(Resource)]
-pub struct ServerUpdates(pub mpmc::Sender<ServerUpdateEnvelope>);
-
-#[derive(Resource)]
-pub struct ActionRecv(pub mpmc::Receiver<(BotId, Action)>);
-
-#[derive(Resource)]
-pub struct SubscriptionRecv(
-    pub mpmc::Receiver<(BotId, Vec<swarm_lib::SubscriptionType>)>,
-);
-
 fn server(
-    new_bots_rx: mpmc::Receiver<u32>,
+    new_bots_rx: mpmc::Receiver<(u32, PawnKind)>,
     server_update_rx: mpmc::Receiver<ServerUpdateEnvelope>,
     action_tx: mpmc::Sender<(BotId, Action)>,
     subscription_tx: mpmc::Sender<(BotId, Vec<swarm_lib::SubscriptionType>)>,
@@ -112,28 +140,26 @@ fn server(
 
 fn handle_connection(
     stream: TcpStream,
-    new_bots_rx: mpmc::Receiver<u32>,
+    new_bots_rx: mpmc::Receiver<(u32, PawnKind)>,
     server_update_rx: mpmc::Receiver<ServerUpdateEnvelope>,
     action_tx: mpmc::Sender<(BotId, Action)>,
     subscription_tx: mpmc::Sender<(BotId, Vec<swarm_lib::SubscriptionType>)>,
 ) -> Result<()> {
-    let protocol = Protocol::new();
-
     let mut reader = BufReader::new(stream.try_clone()?);
     let mut writer = BufWriter::new(stream);
 
-    let connect: ClientMsg = protocol.read_message(&mut reader)?;
+    let connect: ClientMsg = Protocol::read_message(&mut reader)?;
     if !matches!(connect, ClientMsg::Connect) {
         bail!("Expected Connect message, got: {connect:?}");
     }
 
     // Send ConnectAck
-    protocol.write_message(&mut writer, &ServerMsg::ConnectAck)?;
+    Protocol::write_message(&mut writer, &ServerMsg::ConnectAck)?;
 
     std::thread::spawn(move || {
         let mut reader = reader;
         loop {
-            let msg: ClientMsg = protocol.read_message(&mut reader).unwrap();
+            let msg: ClientMsg = Protocol::read_message(&mut reader).unwrap();
             match msg {
                 ClientMsg::Connect => error!("Sent 'Connect' msg twice"),
                 ClientMsg::BotMsg(BotMsgEnvelope {
@@ -163,24 +189,25 @@ fn handle_connection(
     });
 
     loop {
-        if let Ok(new_bot_id) = new_bots_rx.try_recv() {
-            info!("Assigning bot id {new_bot_id}");
-            protocol
-                .write_message(&mut writer, &ServerMsg::AssignBot(new_bot_id))
-                .unwrap();
+        if let Ok((new_bot_id, pawn_kind)) = new_bots_rx.try_recv() {
+            info!("Assigning bot id {new_bot_id}, kind  {pawn_kind}");
+            Protocol::write_message(
+                &mut writer,
+                &ServerMsg::AssignBot(new_bot_id, pawn_kind.to_string()),
+            )
+            .unwrap();
         }
 
         if let Ok(server_update) = server_update_rx.try_recv() {
-            info!(
+            trace!(
                 "Sending server update to bot: {}, seq: {}",
                 server_update.bot_id, server_update.seq
             );
-            protocol
-                .write_message(
-                    &mut writer,
-                    &ServerMsg::ServerUpdate(server_update),
-                )
-                .unwrap();
+            Protocol::write_message(
+                &mut writer,
+                &ServerMsg::ServerUpdate(server_update),
+            )
+            .unwrap();
         }
     }
 }

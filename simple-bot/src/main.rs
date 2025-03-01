@@ -4,7 +4,7 @@ use eyre::Result;
 use rand::Rng;
 use swarm_lib::{
     bevy_math::UVec2,
-    bot_harness::{run_bots, Bot, Rpc},
+    bot_harness::{Bot, Harness, Rpc},
     Action,
     BotResponse,
     Dir,
@@ -12,7 +12,11 @@ use swarm_lib::{
 };
 
 fn main() -> Result<()> {
-    run_bots::<RandomWalkBot>()
+    let mut harness = Harness::new();
+    harness.register::<RandomWalkBot>("FindBot");
+    harness.register::<TerminalControlledBot>("Basic");
+
+    harness.run_bots()
 }
 
 struct RandomWalkBot {
@@ -31,6 +35,8 @@ impl Bot for RandomWalkBot {
             .subscribe(SubscriptionType::Radar)
             .build();
         self.rpc.send_msg(initial_response);
+        self.rpc
+            .info("Bot initialized and subscribed to position and radar");
 
         let mut rng = rand::thread_rng();
 
@@ -38,16 +44,25 @@ impl Bot for RandomWalkBot {
             // Wait for server update
             let update = self.rpc.wait_for_latest_update();
 
-            // Occasionally print debug info
+            // Log debug info every tick
             if update.response.tick % 1 == 0 {
-                println!("RandomWalkBot: tick={}", update.response.tick);
+                self.rpc
+                    .debug(format!("Processing tick {}", update.response.tick));
 
                 if let Some(pos) = &update.response.position {
-                    println!("Current position: {:?}", pos);
+                    self.rpc.debug(format!("Current position: {:?}", pos));
                 }
 
                 if let Some(radar) = &update.response.radar {
-                    println!("Radar shows bots: {:?}", radar.bots);
+                    // Use structured logging for bot detection
+                    let mut attrs = std::collections::HashMap::new();
+                    attrs.insert(
+                        "num_bots".to_string(),
+                        radar.bots.len().to_string(),
+                    );
+                    self.rpc.log_with_attrs("Radar scan complete", attrs);
+
+                    // The print_radar method now logs internally
                     self.rpc.print_radar(&update);
                 }
             }
@@ -60,7 +75,8 @@ impl Bot for RandomWalkBot {
                 3 => Dir::Right,
                 _ => unreachable!(),
             };
-            // let direction = Dir::Right;
+
+            self.rpc.info(format!("Moving {:?}", direction));
 
             // Build and send response with random movement
             let response = BotResponse::builder()
@@ -88,44 +104,55 @@ impl Bot for TerminalControlledBot {
             .subscribe(SubscriptionType::Radar)
             .build();
         self.rpc.send_msg(initial_response);
+        self.rpc.info("Terminal-controlled bot initialized");
 
         loop {
             // Wait for server update
             let update = self.rpc.wait_for_latest_update();
-            println!("Received update: tick={}", update.response.tick);
+            self.rpc.info(format!(
+                "Received update: tick={}",
+                update.response.tick
+            ));
 
-            // if update.response.tick % 4 == 0 {
+            // Display radar data visually
             self.rpc.print_radar(&update);
-            // }
 
             if let Some(pos) = &update.response.position {
-                println!("Current position: {:?}", pos);
+                self.rpc.info(format!("Current position: {:?}", pos));
             }
 
             if let Some(radar) = &update.response.radar {
-                println!("Radar shows {} bots", radar.bots.len());
+                self.rpc
+                    .debug(format!("Radar shows {} bots", radar.bots.len()));
             }
 
-            // Read user input for next action
+            // User interaction prompts still use println since they're for
+            // direct user interaction
             println!(
-                "Enter command (move-forward, move-backward, move-left, \
-                 move-right, move-to, wait):"
+                "Enter command (move-up, move-down, move-left, move-right, \
+                 move-to, wait):"
             );
+
             let mut input = String::new();
             stdin().read_line(&mut input).unwrap();
+            let command = input.trim();
 
             let mut resp = BotResponse::builder();
-            match input.trim() {
+            match command {
                 "move-up" => {
+                    self.rpc.info("Moving UP");
                     resp.push_action(Action::MoveDir(Dir::Up));
                 }
                 "move-down" => {
+                    self.rpc.info("Moving DOWN");
                     resp.push_action(Action::MoveDir(Dir::Down));
                 }
                 "move-left" => {
+                    self.rpc.info("Moving LEFT");
                     resp.push_action(Action::MoveDir(Dir::Left));
                 }
                 "move-right" => {
+                    self.rpc.info("Moving RIGHT");
                     resp.push_action(Action::MoveDir(Dir::Right));
                 }
                 "move-to" => {
@@ -149,9 +176,13 @@ impl Bot for TerminalControlledBot {
                         0
                     };
 
+                    self.rpc
+                        .info(format!("Moving to coordinates ({}, {})", x, y));
                     resp.push_action(Action::MoveTo(UVec2::new(x, y)));
                 }
-                _ => {}
+                _ => {
+                    self.rpc.warn(format!("Unknown command: '{}'", command));
+                }
             }
 
             // Send the response

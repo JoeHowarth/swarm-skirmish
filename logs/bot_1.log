@@ -1,0 +1,24 @@
+[2025-03-01 10:09:15.857] [Tick 0] [INFO] Terminal-controlled bot initialized
+[2025-03-01 10:09:15.857] [Tick 0] [INFO] Received update: tick=0
+[2025-03-01 10:09:15.857] [Tick 0] [WARN] No radar data available. Make sure to subscribe to radar updates.
+[2025-03-01 10:09:25.484] [Tick 0] [INFO] Moving to coordinates (8, 14)
+[2025-03-01 10:09:25.484] [Tick 35] [INFO] Received update: tick=35
+[2025-03-01 10:09:25.484] [Tick 35] [INFO] Radar for Bot 1 (Tick 35):
+┌────────────────────┐
+│[][][].       . . . │
+│[][][]          . . │
+│[][][]        C C . │
+│[][][]      C C     │
+│[][][]    P C       │
+│[][][]              │
+│[][][]            . │
+│[][][][][][][][][][]│
+│[][][][][][][][][][]│
+│[][][][][][][][][][]│
+└────────────────────┘
+
+Bots detected:
+  0: Player at position (5, 5)
+
+[2025-03-01 10:09:25.484] [Tick 35] [INFO] Current position: UVec2(2, 2)
+[2025-03-01 10:09:25.484] [Tick 35] [DEBUG] Radar shows 1 bots

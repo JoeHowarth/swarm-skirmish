@@ -1,7 +1,7 @@
 use array2d::Array2D;
 use bevy::prelude::*;
 
-use crate::CellState;
+use crate::core::{CellKind, CellState, Pos};
 
 #[derive(Resource)]
 pub struct GridWorld {
@@ -11,7 +11,7 @@ pub struct GridWorld {
 impl GridWorld {
     pub fn new(width: usize, height: usize) -> Self {
         Self {
-            grid: Array2D::filled_with(CellState::Empty, width, height),
+            grid: Array2D::filled_with(CellState::default(), width, height),
         }
     }
 
@@ -24,8 +24,20 @@ impl GridWorld {
             .find_path(self, start, goal)
     }
 
+    pub fn get_pos(&self, pos: Pos) -> CellState {
+        self.get(pos.0.x as usize, pos.0.y as usize)
+    }
+
     pub fn get(&self, x: usize, y: usize) -> CellState {
         *self.grid.get(x, y).unwrap()
+    }
+
+    pub fn get_pos_mut(&mut self, pos: Pos) -> &mut CellState {
+        self.get_mut(pos.0.x as usize, pos.0.y as usize)
+    }
+
+    pub fn get_mut(&mut self, x: usize, y: usize) -> &mut CellState {
+        self.grid.get_mut(x, y).unwrap()
     }
 
     pub fn set(&mut self, x: usize, y: usize, state: CellState) {
@@ -193,7 +205,7 @@ impl PathFinder {
             // Check neighbors (using nearby with distance 1)
             for ((nx, ny), state) in grid.nearby(current.0, current.1, 1) {
                 // Skip if neighbor is blocked or already evaluated
-                if *state == CellState::Blocked
+                if state.kind == CellKind::Blocked
                     || closed_set.contains(&(nx, ny))
                 {
                     continue;
@@ -234,7 +246,7 @@ mod tests {
         // Fill with unique values to make testing easier
         for x in 0..5 {
             for y in 0..5 {
-                grid.set(x, y, CellState::Blocked);
+                grid.set(x, y, CellState::default());
             }
         }
         grid
@@ -299,7 +311,7 @@ mod tests {
         assert_eq!(path.len(), 5); // Should be [(0,0), (1,0), (2,0), (2,1), (2,2)]
 
         // Add some obstacles and test path around them
-        grid.set(1, 1, CellState::Blocked);
+        grid.set(1, 1, CellState::blocked());
         let path = pathfinder
             .find_path(&grid, (0, 0), (2, 2))
             .expect("Should find a path");
@@ -312,9 +324,9 @@ mod tests {
         let mut pathfinder = PathFinder::new(3, 3);
 
         // Create a wall of blocked cells
-        grid.set(1, 0, CellState::Blocked);
-        grid.set(1, 1, CellState::Blocked);
-        grid.set(1, 2, CellState::Blocked);
+        grid.set(1, 0, CellState::blocked());
+        grid.set(1, 1, CellState::blocked());
+        grid.set(1, 2, CellState::blocked());
 
         // Try to find path through wall
         let path = pathfinder.find_path(&grid, (0, 1), (2, 1));

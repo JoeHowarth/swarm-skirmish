@@ -1,24 +1,41 @@
 use array2d::Array2D;
 use bevy_ecs::component::Component;
 pub use bevy_math;
-use bevy_math::{UVec2};
+use bevy_math::{IVec2, UVec2};
 use serde::{Deserialize, Serialize};
+use strum_macros::Display;
 
 pub mod bot_harness;
 pub mod protocol;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RadarBotData {
+    pub bot_id: u32,
     pub team: Team,
     pub pos: UVec2,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum CellStateRadar {
+#[derive(
+    Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Default,
+)]
+pub enum CellKindRadar {
+    #[default]
     Unknown,
     Empty,
     Blocked,
-    Bot { idx: usize },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct CellStateRadar {
+    pub kind: CellKindRadar,
+    pub pawn: Option<usize>,
+    pub item: Option<Item>,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum Item {
+    Crumb,
+    Fent,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -153,17 +170,21 @@ pub enum Dir {
 impl Dir {
     pub fn to_deltas(&self) -> (isize, isize) {
         match self {
-            Dir::Up => (0, -1),
-            Dir::Down => (0, 1),
+            Dir::Up => (0, 1),
+            Dir::Down => (0, -1),
             Dir::Left => (-1, 0),
             Dir::Right => (1, 0),
         }
     }
 
+    pub fn from_deltas_ivec(deltas: IVec2) -> Option<Self> {
+        Dir::from_deltas((deltas.x as isize, deltas.y as isize))
+    }
+
     pub fn from_deltas(deltas: (isize, isize)) -> Option<Self> {
         match (deltas.0, deltas.1) {
-            (0, -1) => Some(Dir::Up),
-            (0, 1) => Some(Dir::Down),
+            (0, 1) => Some(Dir::Up),
+            (0, -1) => Some(Dir::Down),
             (-1, 0) => Some(Dir::Left),
             (1, 0) => Some(Dir::Right),
             _ => None,
@@ -180,7 +201,7 @@ pub enum Action {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ServerMsg {
     ConnectAck,
-    AssignBot(u32),
+    AssignBot(u32, String),
     ServerUpdate(ServerUpdateEnvelope),
     Close,
 }
@@ -192,7 +213,9 @@ pub struct ServerUpdateEnvelope {
     pub response: ServerUpdate,
 }
 
-#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    Component, Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Display
+)]
 pub enum Team {
     Player,
     Enemy,

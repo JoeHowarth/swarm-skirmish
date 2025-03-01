@@ -4,7 +4,10 @@ use image::DynamicImage;
 use serde::{Deserialize, Serialize};
 use swarm_lib::Team;
 
-use crate::{gridworld::GridWorld, CellState};
+use crate::{core::CellKind, gridworld::GridWorld, CellState, Item};
+
+#[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
+pub struct TilemapSystemSet;
 
 pub struct TilemapPlugin;
 
@@ -12,7 +15,7 @@ impl Plugin for TilemapPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(bevy_ecs_tilemap::TilemapPlugin);
         app.add_systems(Startup, (load_tileset, setup_map).chain());
-        app.add_systems(Update, render_grid);
+        app.add_systems(Update, render_grid.in_set(TilemapSystemSet));
     }
 }
 
@@ -20,6 +23,7 @@ pub enum CellRender {
     Empty,
     Blocked,
     Pawn(bool),
+    Item(Item),
 }
 
 impl CellRender {
@@ -27,27 +31,30 @@ impl CellRender {
         TileTextureIndex(match self {
             CellRender::Empty => 0,
             CellRender::Blocked => 179,
-            CellRender::Pawn(is_player) => {
-                if *is_player {
-                    1
-                } else {
-                    2
-                }
-            }
+            CellRender::Pawn(true) => 1,
+            CellRender::Pawn(false) => 2,
+            CellRender::Item(Item::Crumb) => 250,
+            CellRender::Item(Item::Fent) => 239,
         })
     }
 
     pub fn from_state(state: &CellState, teams: &Query<&Team>) -> CellRender {
-        match state {
-            CellState::Empty => CellRender::Empty,
-            CellState::Blocked => CellRender::Blocked,
-            CellState::Pawn(pawn_id) => {
-                CellRender::Pawn(teams.get(*pawn_id).unwrap() == &Team::Player)
-            }
+        if let Some(pawn_id) = state.pawn {
+            return CellRender::Pawn(
+                teams.get(pawn_id).unwrap() == &Team::Player,
+            );
+        }
+
+        if let Some(item) = state.item {
+            return CellRender::Item(item);
+        }
+
+        match state.kind {
+            CellKind::Empty => CellRender::Empty,
+            CellKind::Blocked => CellRender::Blocked,
         }
     }
 }
-
 
 fn render_grid(
     tile_storage: Query<&mut TileStorage>,

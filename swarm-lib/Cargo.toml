@@ -4,10 +4,14 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+strum = "0.27"
+strum_macros = "0.27"
 thiserror = { workspace = true }
 serde = { workspace = true }
 bincode = { workspace = true }
+serde_json = { workspace = true }
 eyre = { workspace = true }
+chrono = { workspace = true }
 bevy_ecs = { version = "0.15", features = ["serialize"] }
 bevy_math = { version = "0.15", features = ["serialize"] }
 array2d = { version = "0.3", features = ["serde"] }
