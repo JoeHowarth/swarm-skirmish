@@ -1,7 +1,8 @@
 use array2d::Array2D;
 use bevy::prelude::*;
+use swarm_lib::Pos;
 
-use crate::core::{CellKind, CellState, Pos};
+use crate::core::{CellKind, CellState};
 
 #[derive(Resource)]
 pub struct GridWorld {
@@ -17,15 +18,15 @@ impl GridWorld {
 
     pub fn find_path(
         &self,
-        start: impl Into<UVec2>,
-        goal: impl Into<UVec2>,
-    ) -> Option<Vec<UVec2>> {
+        start: impl Into<Pos>,
+        goal: impl Into<Pos>,
+    ) -> Option<Vec<Pos>> {
         PathFinder::new(self.width(), self.height())
             .find_path(self, start, goal)
     }
 
     pub fn get_pos(&self, pos: Pos) -> CellState {
-        self.get(pos.0.x as usize, pos.0.y as usize)
+        self.get(pos.x(), pos.y())
     }
 
     pub fn get(&self, x: usize, y: usize) -> CellState {
@@ -33,7 +34,7 @@ impl GridWorld {
     }
 
     pub fn get_pos_mut(&mut self, pos: Pos) -> &mut CellState {
-        self.get_mut(pos.0.x as usize, pos.0.y as usize)
+        self.get_mut(pos.x(), pos.y())
     }
 
     pub fn get_mut(&mut self, x: usize, y: usize) -> &mut CellState {
@@ -98,6 +99,17 @@ impl GridWorld {
 
         iter
     }
+
+    pub fn in_bounds_i(&self, pos: (isize, isize)) -> bool {
+        pos.0 >= 0
+            && pos.1 >= 0
+            && pos.0 < self.width() as isize
+            && pos.1 < self.height() as isize
+    }
+
+    pub fn in_bounds(&self, pos: &Pos) -> bool {
+        pos.x() < self.width() && pos.y() < self.height()
+    }
 }
 
 #[derive(Debug)]
@@ -126,14 +138,14 @@ impl PathFinder {
         dx + dy
     }
 
-    fn reconstruct_path(&self, current: (usize, usize)) -> Vec<UVec2> {
-        let mut path = vec![UVec2::from((current.0 as u32, current.1 as u32))];
+    fn reconstruct_path(&self, current: (usize, usize)) -> Vec<Pos> {
+        let mut path = vec![Pos(current)];
         let mut current = current;
 
         while let Some(pos) = self.came_from.get(current.0, current.1).unwrap()
         {
             current = *pos;
-            path.push(UVec2::from((current.0 as u32, current.1 as u32)));
+            path.push(Pos(current));
         }
 
         path.reverse();
@@ -143,17 +155,15 @@ impl PathFinder {
     pub fn find_path(
         &mut self,
         grid: &GridWorld,
-        start: impl Into<UVec2>,
-        goal: impl Into<UVec2>,
-    ) -> Option<Vec<UVec2>> {
+        start: impl Into<Pos>,
+        goal: impl Into<Pos>,
+    ) -> Option<Vec<Pos>> {
         use std::{
             cmp::Ordering,
             collections::{BinaryHeap, HashSet},
         };
-        let start: UVec2 = start.into();
-        let goal: UVec2 = goal.into();
-        let start = (start.x as usize, start.y as usize);
-        let goal = (goal.x as usize, goal.y as usize);
+        let start = start.into().0;
+        let goal = goal.into().0;
 
         #[derive(Eq, PartialEq)]
         struct Node {

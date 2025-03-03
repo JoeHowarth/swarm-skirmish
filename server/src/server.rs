@@ -4,14 +4,12 @@ use std::{
     sync::mpmc,
 };
 
-use bevy::{
-    prelude::*,
-    utils::HashMap,
-};
+use bevy::{prelude::*, utils::HashMap};
 use eyre::{bail, Result};
 use swarm_lib::{
     protocol::Protocol,
     Action,
+    ActionEnvelope,
     BotMsgEnvelope,
     ClientMsg,
     ServerMsg,
@@ -20,13 +18,13 @@ use swarm_lib::{
 };
 
 use crate::{
-    actions::ActionQueue,
+    actions::{ActionQueue, ComputedActionQueue, InProgressAction},
     core::PawnKind,
     subscriptions::Subscriptions,
 };
 
 #[derive(Component, Debug, Clone, Copy, Hash, PartialEq, Eq)]
-#[require(ActionQueue, Subscriptions)]
+#[require(Subscriptions, ActionQueue, InProgressAction, ComputedActionQueue)]
 pub struct BotId(pub u32);
 
 #[derive(Resource)]
@@ -36,7 +34,7 @@ pub struct NewBots(pub mpmc::Sender<(u32, PawnKind)>);
 pub struct ServerUpdates(pub mpmc::Sender<ServerUpdateEnvelope>);
 
 #[derive(Resource)]
-pub struct ActionRecv(pub mpmc::Receiver<(BotId, Action)>);
+pub struct ActionRecv(pub mpmc::Receiver<(BotId, u32, ActionEnvelope)>);
 
 #[derive(Resource)]
 pub struct SubscriptionRecv(
@@ -96,7 +94,7 @@ fn add_new_bots(
 fn server(
     new_bots_rx: mpmc::Receiver<(u32, PawnKind)>,
     server_update_rx: mpmc::Receiver<ServerUpdateEnvelope>,
-    action_tx: mpmc::Sender<(BotId, Action)>,
+    action_tx: mpmc::Sender<(BotId, u32, ActionEnvelope)>,
     subscription_tx: mpmc::Sender<(BotId, Vec<swarm_lib::SubscriptionType>)>,
 ) {
     let listener = TcpListener::bind("127.0.0.1:1234").unwrap();
@@ -127,7 +125,7 @@ fn handle_connection(
     stream: TcpStream,
     new_bots_rx: mpmc::Receiver<(u32, PawnKind)>,
     server_update_rx: mpmc::Receiver<ServerUpdateEnvelope>,
-    action_tx: mpmc::Sender<(BotId, Action)>,
+    action_tx: mpmc::Sender<(BotId, u32, ActionEnvelope)>,
     subscription_tx: mpmc::Sender<(BotId, Vec<swarm_lib::SubscriptionType>)>,
 ) -> Result<()> {
     let mut reader = BufReader::new(stream.try_clone()?);
@@ -147,14 +145,10 @@ fn handle_connection(
             let msg: ClientMsg = Protocol::read_message(&mut reader).unwrap();
             match msg {
                 ClientMsg::Connect => error!("Sent 'Connect' msg twice"),
-                ClientMsg::BotMsg(BotMsgEnvelope {
-                    bot_id,
-                    seq: _seq,
-                    msg,
-                }) => {
+                ClientMsg::BotMsg(BotMsgEnvelope { bot_id, tick, msg }) => {
                     // Process bot response
                     for action in msg.actions {
-                        action_tx.send((BotId(bot_id), action)).unwrap();
+                        action_tx.send((BotId(bot_id), tick, action)).unwrap();
                     }
 
                     // Handle subscriptions
@@ -186,7 +180,8 @@ fn handle_connection(
         if let Ok(server_update) = server_update_rx.try_recv() {
             trace!(
                 "Sending server update to bot: {}, seq: {}",
-                server_update.bot_id, server_update.seq
+                server_update.bot_id,
+                server_update.seq
             );
             Protocol::write_message(
                 &mut writer,

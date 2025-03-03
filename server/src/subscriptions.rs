@@ -1,12 +1,9 @@
-
 use array2d::Array2D;
-use bevy::{
-    prelude::*,
-    utils::HashSet,
-};
+use bevy::{prelude::*, utils::HashSet};
 use swarm_lib::{
     CellKindRadar,
     CellStateRadar,
+    Pos,
     RadarBotData,
     RadarData,
     ServerUpdate,
@@ -16,10 +13,10 @@ use swarm_lib::{
 };
 
 use crate::{
+    actions::InProgressAction,
     core::{CellKind, Tick},
     gridworld::GridWorld,
     server::{BotId, BotIdToEntity, ServerUpdates, SubscriptionRecv},
-    Pos,
 };
 
 #[derive(Component, Default)]
@@ -56,10 +53,10 @@ fn handle_bot_subscriptions(
 fn send_server_updates(
     update_tx: Res<ServerUpdates>,
     tick: Res<Tick>,
-    query: Query<(&BotId, &Pos, &Team, &Subscriptions)>,
+    query: Query<(&BotId, &Pos, &Team, &Subscriptions, &InProgressAction)>,
     grid_world: Res<GridWorld>,
 ) {
-    for (bot_id, pos, team, subscriptions) in query.iter() {
+    for (bot_id, pos, team, subscriptions, in_progress_action) in query.iter() {
         let update = ServerUpdateEnvelope {
             bot_id: bot_id.0,
             seq: 0,
@@ -72,11 +69,13 @@ fn send_server_updates(
                 position: subscriptions
                     .0
                     .get(&SubscriptionType::Position)
-                    .map(|_| pos.0),
+                    .map(|_| pos)
+                    .copied(),
                 radar: subscriptions
                     .0
                     .get(&SubscriptionType::Radar)
                     .map(|_| create_radar_data(pos, &grid_world, &query)),
+                action_result: in_progress_action.opt.clone(),
             },
         };
 
@@ -87,11 +86,14 @@ fn send_server_updates(
 fn create_radar_data(
     pos: &Pos,
     grid_world: &GridWorld,
-    query: &Query<(&BotId, &Pos, &Team, &Subscriptions)>,
+    query: &Query<(&BotId, &Pos, &Team, &Subscriptions, &InProgressAction)>,
 ) -> RadarData {
-    // Create a radar with a 10x10 grid centered on the bot
-    let radar_size = 10;
-    let radar_center = radar_size / 2; // Center point (5 for a 10x10 grid)
+    // Create a radar with a 11x11 grid centered on the bot
+    let radar_size = 11;
+    let radar_center = radar_size / 2; // Center point (5 for a 11x11 grid)
+
+    // Get bot's world coordinates
+    let (bot_world_x, bot_world_y) = pos.as_isize();
 
     let mut radar = RadarData {
         bots: Vec::new(),
@@ -100,11 +102,8 @@ fn create_radar_data(
             radar_size,
             radar_size,
         ),
+        center_world_pos: *pos,
     };
-
-    // Get bot's world coordinates
-    let bot_world_x = pos.0.x as isize;
-    let bot_world_y = pos.0.y as isize;
 
     // Use nearby to get cells in radar range with Manhattan distance
     grid_world
@@ -131,12 +130,12 @@ fn create_radar_data(
                     CellKind::Blocked => CellKindRadar::Blocked,
                 },
                 pawn: cell.pawn.map(|e| {
-                    let (bot_id, _, &team, _) = query.get(e).unwrap();
+                    let (bot_id, _, &team, _, _) = query.get(e).unwrap();
 
                     // Store the bot's position in radar coordinates
                     radar.bots.push(RadarBotData {
                         team,
-                        pos: UVec2::new(radar_x as u32, radar_y as u32),
+                        pos: Pos::from((radar_x, radar_y)),
                         bot_id: bot_id.0,
                     });
 

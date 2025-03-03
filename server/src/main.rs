@@ -1,25 +1,15 @@
 #![allow(unused_imports)]
 #![feature(mpmc_channel)]
 
-use core::{CellState, CorePlugin, CoreSystemsSet, Inventory, PawnKind, Pos};
+use core::{CellState, CorePlugin, CoreSystemsSet, Inventory, PawnKind};
 use std::time::Duration;
 
 use actions::{ActionsPlugin, ActionsSystemSet};
-use bevy::{
-    prelude::*,
-    time::common_conditions::on_timer,
-};
+use bevy::{prelude::*, time::common_conditions::on_timer};
 use gridworld::GridWorld;
-use server::{
-    BotHandlerPlugin,
-    BotId,
-    ServerSystems,
-};
+use server::{BotHandlerPlugin, BotId, ServerSystems};
 use subscriptions::{SubscriptionsPlugin, SubscriptionsSystemSet};
-use swarm_lib::{
-    Item,
-    Team,
-};
+use swarm_lib::{Item, Pos, Team};
 use tilemap::TilemapSystemSet;
 
 mod actions;
@@ -49,14 +39,14 @@ fn main() {
         .configure_sets(
             Update,
             (
-                ServerSystems,
-                SubscriptionsSystemSet,
                 ActionsSystemSet,
                 CoreSystemsSet,
                 TilemapSystemSet,
+                ServerSystems,
+                SubscriptionsSystemSet,
             )
                 .chain()
-                .run_if(on_timer(Duration::from_millis(250))),
+                .run_if(on_timer(Duration::from_millis(1000))),
         )
         .add_systems(Update, (exit_system, check_win_condition, display_win_ui))
         .run();
@@ -81,8 +71,8 @@ fn init_map(mut commands: Commands) {
     }
 
     // Add crumbs
-    for coord in grid_world.find_path((3, 2), (8, 13)).unwrap() {
-        let cell = grid_world.get_mut(coord.x as usize, coord.y as usize);
+    for coord in grid_world.find_path((5, 3), (8, 13)).unwrap() {
+        let cell = grid_world.get_pos_mut(coord);
         cell.item = Some(Item::Crumb);
     }
     // Add fent at end of crumb trail

@@ -1,48 +1,13 @@
-use array2d::Array2D;
 use bevy_ecs::component::Component;
 pub use bevy_math;
-use bevy_math::{IVec2, UVec2};
 use serde::{Deserialize, Serialize};
 use strum_macros::Display;
 
 pub mod bot_harness;
 pub mod protocol;
+pub mod types;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RadarBotData {
-    pub bot_id: u32,
-    pub team: Team,
-    pub pos: UVec2,
-}
-
-#[derive(
-    Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Default,
-)]
-pub enum CellKindRadar {
-    #[default]
-    Unknown,
-    Empty,
-    Blocked,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
-pub struct CellStateRadar {
-    pub kind: CellKindRadar,
-    pub pawn: Option<usize>,
-    pub item: Option<Item>,
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum Item {
-    Crumb,
-    Fent,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RadarData {
-    pub bots: Vec<RadarBotData>,
-    pub cells: Array2D<CellStateRadar>,
-}
+pub use types::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum SubscriptionType {
@@ -59,13 +24,13 @@ pub struct ServerUpdate {
 
     // Subscribed state (only what the bot has requested)
     pub team: Option<Team>,
-    pub position: Option<UVec2>,
+    pub position: Option<Pos>,
     pub radar: Option<RadarData>,
     // pub team_status: Option<TeamStatus>,
     // pub resources: Option<ResourceData>,
 
     // Results from previous actions
-    // pub action_results: Vec<ActionResult>,
+    pub action_result: Option<ActionResult>,
 
     // Server messages (errors, notifications, etc.)
     // pub messages: Vec<ServerMessage>,
@@ -75,7 +40,7 @@ pub struct ServerUpdate {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BotResponse {
     // Actions to take (empty vec if none)
-    pub actions: Vec<Action>,
+    pub actions: Vec<ActionEnvelope>,
 
     // Subscription changes (both additions and removals)
     pub subscribe: Vec<SubscriptionType>,
@@ -98,52 +63,6 @@ impl BotResponse {
     }
 }
 
-/// Builder for BotResponse to enable fluent method chaining
-#[derive(Debug, Clone, Default)]
-pub struct BotResponseBuilder {
-    actions: Vec<Action>,
-    subscribe: Vec<SubscriptionType>,
-    unsubscribe: Vec<SubscriptionType>,
-}
-
-impl BotResponseBuilder {
-    /// Create a new empty BotResponseBuilder
-    pub fn new() -> Self {
-        Self {
-            actions: Vec::new(),
-            subscribe: Vec::new(),
-            unsubscribe: Vec::new(),
-        }
-    }
-
-    /// Add an action to the response
-    pub fn push_action(&mut self, action: Action) -> &mut Self {
-        self.actions.push(action);
-        self
-    }
-
-    /// Add a subscription to the response
-    pub fn subscribe(&mut self, subscription: SubscriptionType) -> &mut Self {
-        self.subscribe.push(subscription);
-        self
-    }
-
-    /// Add an unsubscription to the response
-    pub fn unsubscribe(&mut self, subscription: SubscriptionType) -> &mut Self {
-        self.unsubscribe.push(subscription);
-        self
-    }
-
-    /// Build the final BotResponse
-    pub fn build(&mut self) -> BotResponse {
-        BotResponse {
-            actions: std::mem::take(&mut self.actions),
-            subscribe: std::mem::take(&mut self.subscribe),
-            unsubscribe: std::mem::take(&mut self.unsubscribe),
-        }
-    }
-}
-
 ///////////////
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -155,11 +74,19 @@ pub enum ClientMsg {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BotMsgEnvelope {
     pub bot_id: u32,
-    pub seq: u32,
+    pub tick: u32,
     pub msg: BotResponse,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Copy,
+    Clone,
+    Serialize,
+    Deserialize,
+    strum_macros::EnumIter,
+    strum_macros::FromRepr,
+)]
 pub enum Dir {
     Up,
     Down,
@@ -167,35 +94,32 @@ pub enum Dir {
     Right,
 }
 
-impl Dir {
-    pub fn to_deltas(&self) -> (isize, isize) {
-        match self {
-            Dir::Up => (0, 1),
-            Dir::Down => (0, -1),
-            Dir::Left => (-1, 0),
-            Dir::Right => (1, 0),
-        }
-    }
+pub type ActionId = u32;
 
-    pub fn from_deltas_ivec(deltas: IVec2) -> Option<Self> {
-        Dir::from_deltas((deltas.x as isize, deltas.y as isize))
-    }
-
-    pub fn from_deltas(deltas: (isize, isize)) -> Option<Self> {
-        match (deltas.0, deltas.1) {
-            (0, 1) => Some(Dir::Up),
-            (0, -1) => Some(Dir::Down),
-            (-1, 0) => Some(Dir::Left),
-            (1, 0) => Some(Dir::Right),
-            _ => None,
-        }
-    }
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActionEnvelope {
+    pub id: ActionId,
+    pub action: Action,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Action {
     MoveDir(Dir),
-    MoveTo(UVec2), // WaitUntilTick(u32),
+    MoveTo(Pos),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActionResult {
+    pub action: Action,
+    pub id: ActionId,
+    pub status: ActionStatus,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ActionStatus {
+    Success,
+    Failure,
+    InProgress,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -214,9 +138,18 @@ pub struct ServerUpdateEnvelope {
 }
 
 #[derive(
-    Component, Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Display
+    Component,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    Display,
 )]
 pub enum Team {
     Player,
     Enemy,
 }
+

@@ -14,15 +14,7 @@ use chrono::Local;
 use eyre::Result;
 
 use crate::{
-    protocol::Protocol,
-    BotMsgEnvelope,
-    BotResponse,
-    CellKindRadar,
-    ClientMsg,
-    RadarData,
-    ServerMsg,
-    ServerUpdateEnvelope,
-    Team,
+    protocol::Protocol, BotMsgEnvelope, BotResponse, CellKindRadar, ClientMsg, RadarData, ServerMsg, ServerUpdate, ServerUpdateEnvelope, Team
 };
 
 /// Log level for bot logs
@@ -190,13 +182,13 @@ impl BotLogger {
             return;
         }
 
-        // Print header
-        println!(
-            "\n===== Bot {} - Tick {} =====",
+        // Build the entire output as a single string to write at once
+        let mut output = format!(
+            "\n===== Bot {} - Tick {} =====\n",
             self.bot_id, self.current_tick
         );
 
-        // Print all buffered messages
+        // Add all buffered messages
         for entry in &self.buffer {
             let prefix = match entry.level {
                 LogLevel::Debug => "\x1b[36mDEBUG\x1b[0m", // Cyan
@@ -205,47 +197,57 @@ impl BotLogger {
                 LogLevel::Error => "\x1b[31mERROR\x1b[0m", // Red
             };
 
-            println!("[{}] {}", prefix, entry.message);
+            output.push_str(&format!("[{}] {}\n", prefix, entry.message));
 
-            // Print attributes if present
+            // Add attributes if present
             if let Some(attrs) = &entry.attrs {
                 for (key, value) in attrs {
-                    println!("  {} = {}", key, value);
+                    output.push_str(&format!("  {} = {}\n", key, value));
                 }
             }
         }
 
-        println!("=========================");
+        output.push_str("=========================\n");
+
+        // Use a mutex to lock stdout and prevent interleaved output from
+        // multiple bots
+        use std::io::{self, Write};
+        let stdout = io::stdout();
+        let mut handle = stdout.lock();
+
+        // Write the entire output at once while holding the lock
+        let _ = handle.write_all(output.as_bytes());
+        let _ = handle.flush();
 
         // Clear the buffer
         self.buffer.clear();
     }
 }
 
-pub struct Rpc {
+pub struct Ctx {
     pub bot_id: u32,
-    pub seq: u32,
+    pub last_received_tick: u32,
     pub resp_rx: Receiver<ServerUpdateEnvelope>,
     pub bot_msg_tx: Sender<BotMsgEnvelope>,
     pub logger: BotLogger,
 }
 
-impl Rpc {
+impl Ctx {
     pub fn new(
         bot_id: u32,
         resp_rx: Receiver<ServerUpdateEnvelope>,
         bot_msg_tx: Sender<BotMsgEnvelope>,
     ) -> Self {
-        Rpc {
+        Ctx {
             bot_id,
-            seq: 0,
+            last_received_tick: 0,
             resp_rx,
             bot_msg_tx,
             logger: BotLogger::new(bot_id),
         }
     }
 
-    pub fn wait_for_latest_update(&mut self) -> ServerUpdateEnvelope {
+    pub fn wait_for_latest_update(&mut self) -> ServerUpdate {
         let mut update = self
             .resp_rx
             .recv()
@@ -258,11 +260,12 @@ impl Rpc {
 
         // Update the logger's tick
         self.logger.set_tick(update.response.tick);
+        self.last_received_tick = update.response.tick;
 
-        update
+        update.response
     }
 
-    pub fn wait_for_update(&mut self) -> ServerUpdateEnvelope {
+    pub fn wait_for_update(&mut self) -> ServerUpdate {
         let update = self
             .resp_rx
             .recv()
@@ -270,19 +273,19 @@ impl Rpc {
 
         // Update the logger's tick
         self.logger.set_tick(update.response.tick);
+        self.last_received_tick = update.response.tick;
 
-        update
+        update.response
     }
 
     pub fn send_msg(&mut self, bot_msg: BotResponse) {
+        self.debug(format!("Actions: {:?}", &bot_msg.actions));
+
         let envelope = BotMsgEnvelope {
             bot_id: self.bot_id,
-            seq: self.seq,
+            tick: self.last_received_tick,
             msg: bot_msg,
         };
-
-        // Increment sequence number for next message
-        self.seq += 1;
 
         self.bot_msg_tx
             .send(envelope)
@@ -324,12 +327,12 @@ impl Rpc {
     }
 
     /// Prints the radar data to the terminal if available in the server update
-    pub fn print_radar(&mut self, update: &ServerUpdateEnvelope) {
-        if let Some(radar) = &update.response.radar {
+    pub fn print_radar(&mut self, update: &ServerUpdate) {
+        if let Some(radar) = &update.radar {
             self.logger.info(format!(
                 "Radar for Bot {} (Tick {}):\n{}",
                 self.bot_id,
-                update.response.tick,
+                update.tick,
                 format_radar(radar)
             ));
         } else {
@@ -341,55 +344,30 @@ impl Rpc {
     }
 }
 
-pub trait Bot: Send {
-    fn new(rpc: Rpc) -> Self;
-    fn run(self) -> Result<()>;
+pub trait Bot: Send + 'static {
+    fn new(ctx: Ctx) -> Self
+    where
+        Self: Sized;
+    fn run(&mut self) -> Result<()>;
 }
 
-// New code for multi-bot harness
-type BotFactory =
-    Box<dyn Fn(Rpc) -> Box<dyn FnOnce() -> Result<()> + Send> + Send + Sync>;
+type BotFactory = Box<dyn Fn(Ctx) -> Box<dyn Bot> + Send>;
 
 pub struct Harness {
     factories: HashMap<String, BotFactory>,
-    default_bot: Option<String>,
 }
 
 impl Harness {
     pub fn new() -> Self {
         Self {
             factories: HashMap::new(),
-            default_bot: None,
         }
     }
 
-    pub fn register<B: Bot + Send + 'static>(
-        &mut self,
-        name: impl Into<String>,
-    ) -> &mut Self {
-        let factory: BotFactory = Box::new(|rpc| {
-            Box::new(move || {
-                let bot = B::new(rpc);
-                bot.run()
-            })
-        });
+    pub fn register<B: Bot>(&mut self, name: impl Into<String>) -> &mut Self {
+        self.factories
+            .insert(name.into(), Box::new(move |ctx| Box::new(B::new(ctx))));
 
-        // Set as default if it's the first registered bot
-        let name = name.into();
-        if self.default_bot.is_none() {
-            self.default_bot = Some(name.clone());
-        }
-        self.factories.insert(name, factory);
-
-        self
-    }
-
-    pub fn set_default(&mut self, name: impl Into<String>) -> &mut Self {
-        let name = name.into();
-        if !self.factories.contains_key(&name) {
-            panic!("Cannot set default to unregistered bot type: {}", name);
-        }
-        self.default_bot = Some(name);
         self
     }
 
@@ -408,9 +386,6 @@ impl Harness {
 
         let (bot_msg_tx, bot_msg_rx) = mpsc::channel();
         let factories = self.factories;
-        let default_bot = self
-            .default_bot
-            .expect("At least one bot type must be registered");
 
         std::thread::spawn(move || {
             let mut response_channel_map =
@@ -423,37 +398,31 @@ impl Harness {
                     ServerMsg::ConnectAck => println!("ConnectAck"),
                     ServerMsg::AssignBot(bot_id, bot_type) => {
                         println!(
-                            "Got AssignBot msg: {bot_id} (type: {bot_type})"
+                            "Got AssignBot msg: {bot_id} (type: {bot_type}), \
+                             spawning bot..."
                         );
 
-                        // Get the factory for this bot type
-                        let factory = match factories.get(&bot_type) {
-                            Some(f) => f,
-                            None => {
-                                eprintln!(
-                                    "Unknown bot type: {}, using default",
-                                    bot_type
-                                );
-                                factories
-                                    .get(&default_bot)
-                                    .expect("Default bot not found")
-                            }
-                        };
-
+                        // Set up channels and Ctx
                         let (resp_tx, resp_rx) = mpsc::channel();
                         let bot_msg_tx = bot_msg_tx.clone();
+                        let ctx = Ctx::new(bot_id, resp_rx, bot_msg_tx);
 
                         response_channel_map.insert(bot_id, resp_tx);
 
-                        // Create and run the bot
-                        let run_bot =
-                            factory(Rpc::new(bot_id, resp_rx, bot_msg_tx));
+                        // Use factory to create bot
+                        let factory = factories.get(&bot_type).unwrap();
+                        let mut bot = factory(ctx);
 
+                        // Spawn bot
                         std::thread::spawn(move || {
-                            if let Err(e) = run_bot() {
-                                eprintln!("Bot {} error: {:?}", bot_id, e);
+                            if let Err(e) = bot.run() {
+                                eprintln!(
+                                    "[Error] Bot {} error: {:?}",
+                                    bot_id, e
+                                );
                             }
                         });
+                        println!("Bot Spawned: {bot_id}");
                     }
                     ServerMsg::ServerUpdate(server_update_envelope) => {
                         // Find the correct response channel for this bot
@@ -541,10 +510,8 @@ pub fn format_radar(radar: &RadarData) -> String {
     if !radar.bots.is_empty() {
         output.push_str("\nBots detected:\n");
         for (i, bot) in radar.bots.iter().enumerate() {
-            output.push_str(&format!(
-                "  {}: {:?} at position ({}, {})\n",
-                i, bot.team, bot.pos.x, bot.pos.y
-            ));
+            output
+                .push_str(&format!("  {}: {:?} at {}\n", i, bot.team, bot.pos));
         }
     }
 
