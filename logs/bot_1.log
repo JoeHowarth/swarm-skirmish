@@ -1,11 +1,11 @@
-[2025-03-02 16:54:44.847] [Tick 0] [DEBUG] Actions: []
-[2025-03-02 16:54:44.847] [Tick 0] [INFO] Bot initialized and subscribed to position and radar
-[2025-03-02 16:54:44.847] [Tick 1] [WARN] Update does not contain position
-[2025-03-02 16:54:45.846] [Tick 2] [DEBUG] Processing tick 2
-[2025-03-02 16:54:45.846] [Tick 2] [DEBUG] Current position: Pos((2, 2))
-[2025-03-02 16:54:45.846] [Tick 2] [INFO] Radar scan complete
+[2025-03-03 21:53:05.704] [Tick 0] [DEBUG] Actions: []
+[2025-03-03 21:53:05.704] [Tick 0] [INFO] Bot initialized and subscribed to position and radar
+[2025-03-03 21:53:05.704] [Tick 1] [WARN] Update does not contain position
+[2025-03-03 21:53:07.492] [Tick 2] [DEBUG] Processing tick 2
+[2025-03-03 21:53:07.492] [Tick 2] [DEBUG] Current position: Pos((2, 2))
+[2025-03-03 21:53:07.492] [Tick 2] [INFO] Radar scan complete
   num_bots = 1
-[2025-03-02 16:54:45.846] [Tick 2] [INFO] Radar for Bot 1 (Tick 2):
+[2025-03-03 21:53:07.492] [Tick 2] [INFO] Radar for Bot 1 (Tick 2):
 ┌──────────────────────┐
 │[][][]. .   . . . . . │
 │[][][].       . . . . │
@@ -23,13 +23,13 @@
 Bots detected:
   0: Player at Pos(5, 5)
 
-[2025-03-02 16:54:45.846] [Tick 2] [DEBUG] No adjacent Fent or Crumb, moving to default dir
-[2025-03-02 16:54:45.846] [Tick 2] [DEBUG] Actions: [ActionEnvelope { id: 1, action: MoveDir(Up) }]
-[2025-03-02 16:54:46.846] [Tick 3] [DEBUG] Processing tick 3
-[2025-03-02 16:54:46.846] [Tick 3] [DEBUG] Current position: Pos((2, 3))
-[2025-03-02 16:54:46.846] [Tick 3] [INFO] Radar scan complete
+[2025-03-03 21:53:07.493] [Tick 2] [DEBUG] No adjacent Fent or Crumb, moving to default dir
+[2025-03-03 21:53:07.493] [Tick 2] [DEBUG] Actions: [ActionEnvelope { id: 1, action: MoveDir(Up) }]
+[2025-03-03 21:53:08.495] [Tick 3] [DEBUG] Processing tick 3
+[2025-03-03 21:53:08.495] [Tick 3] [DEBUG] Current position: Pos((2, 3))
+[2025-03-03 21:53:08.495] [Tick 3] [INFO] Radar scan complete
   num_bots = 1
-[2025-03-02 16:54:46.846] [Tick 3] [INFO] Radar for Bot 1 (Tick 3):
+[2025-03-03 21:53:08.495] [Tick 3] [INFO] Radar for Bot 1 (Tick 3):
 ┌──────────────────────┐
 │[][][]. .   . . . . . │
 │[][][].       . . . . │
@@ -47,14 +47,14 @@ Bots detected:
 Bots detected:
   0: Player at Pos(5, 5)
 
-[2025-03-02 16:54:46.846] [Tick 3] [DEBUG] Action Result: ActionResult { action: MoveDir(Up), id: 1, status: Success }
-[2025-03-02 16:54:46.846] [Tick 3] [DEBUG] Found Crumb
-[2025-03-02 16:54:46.846] [Tick 3] [DEBUG] Actions: [ActionEnvelope { id: 2, action: MoveTo(Pos((5, 3))) }]
-[2025-03-02 16:54:47.846] [Tick 4] [DEBUG] Processing tick 4
-[2025-03-02 16:54:47.846] [Tick 4] [DEBUG] Current position: Pos((3, 3))
-[2025-03-02 16:54:47.846] [Tick 4] [INFO] Radar scan complete
+[2025-03-03 21:53:08.495] [Tick 3] [DEBUG] ActionResult { action: MoveDir(Up), id: 1, status: Success }
+[2025-03-03 21:53:08.495] [Tick 3] [DEBUG] Found Crumb
+[2025-03-03 21:53:08.495] [Tick 3] [DEBUG] Actions: [ActionEnvelope { id: 2, action: MoveTo(Pos((5, 3))) }]
+[2025-03-03 21:53:09.497] [Tick 4] [DEBUG] Processing tick 4
+[2025-03-03 21:53:09.497] [Tick 4] [DEBUG] Current position: Pos((3, 3))
+[2025-03-03 21:53:09.497] [Tick 4] [INFO] Radar scan complete
   num_bots = 1
-[2025-03-02 16:54:47.846] [Tick 4] [INFO] Radar for Bot 1 (Tick 4):
+[2025-03-03 21:53:09.497] [Tick 4] [INFO] Radar for Bot 1 (Tick 4):
 ┌──────────────────────┐
 │[][]. . .   . . . . . │
 │[][]. .       . . . . │
@@ -72,13 +72,13 @@ Bots detected:
 Bots detected:
   0: Player at Pos(5, 5)
 
-[2025-03-02 16:54:47.846] [Tick 4] [DEBUG] Action Result: ActionResult { action: MoveTo(Pos((5, 3))), id: 2, status: InProgress }
-[2025-03-02 16:54:47.846] [Tick 4] [INFO] Previous action still in progress, waiting...
-[2025-03-02 16:54:48.846] [Tick 5] [DEBUG] Processing tick 5
-[2025-03-02 16:54:48.846] [Tick 5] [DEBUG] Current position: Pos((4, 3))
-[2025-03-02 16:54:48.846] [Tick 5] [INFO] Radar scan complete
+[2025-03-03 21:53:09.497] [Tick 4] [DEBUG] ActionResult { action: MoveTo(Pos((5, 3))), id: 2, status: InProgress }
+[2025-03-03 21:53:09.497] [Tick 4] [INFO] Previous action still in progress, waiting...
+[2025-03-03 21:53:10.497] [Tick 5] [DEBUG] Processing tick 5
+[2025-03-03 21:53:10.497] [Tick 5] [DEBUG] Current position: Pos((4, 3))
+[2025-03-03 21:53:10.497] [Tick 5] [INFO] Radar scan complete
   num_bots = 1
-[2025-03-02 16:54:48.846] [Tick 5] [INFO] Radar for Bot 1 (Tick 5):
+[2025-03-03 21:53:10.497] [Tick 5] [INFO] Radar for Bot 1 (Tick 5):
 ┌──────────────────────┐
 │[]. . . .   . . . . . │
 │[]. . .     C . . . . │
@@ -96,13 +96,13 @@ Bots detected:
 Bots detected:
   0: Player at Pos(5, 5)
 
-[2025-03-02 16:54:48.846] [Tick 5] [DEBUG] Action Result: ActionResult { action: MoveTo(Pos((5, 3))), id: 2, status: InProgress }
-[2025-03-02 16:54:48.846] [Tick 5] [INFO] Previous action still in progress, waiting...
-[2025-03-02 16:54:49.846] [Tick 6] [DEBUG] Processing tick 6
-[2025-03-02 16:54:49.847] [Tick 6] [DEBUG] Current position: Pos((5, 3))
-[2025-03-02 16:54:49.847] [Tick 6] [INFO] Radar scan complete
+[2025-03-03 21:53:10.497] [Tick 5] [DEBUG] ActionResult { action: MoveTo(Pos((5, 3))), id: 2, status: InProgress }
+[2025-03-03 21:53:10.497] [Tick 5] [INFO] Previous action still in progress, waiting...
+[2025-03-03 21:53:11.498] [Tick 6] [DEBUG] Processing tick 6
+[2025-03-03 21:53:11.498] [Tick 6] [DEBUG] Current position: Pos((5, 3))
+[2025-03-03 21:53:11.498] [Tick 6] [INFO] Radar scan complete
   num_bots = 1
-[2025-03-02 16:54:49.847] [Tick 6] [INFO] Radar for Bot 1 (Tick 6):
+[2025-03-03 21:53:11.498] [Tick 6] [INFO] Radar for Bot 1 (Tick 6):
 ┌──────────────────────┐
 │. . . . . C . . . . . │
 │. . . .   C   . . . . │
@@ -120,39 +120,14 @@ Bots detected:
 Bots detected:
   0: Player at Pos(5, 5)
 
-[2025-03-02 16:54:49.847] [Tick 6] [DEBUG] Action Result: ActionResult { action: MoveTo(Pos((5, 3))), id: 2, status: Success }
-[2025-03-02 16:54:49.847] [Tick 6] [DEBUG] Found Crumb
-[2025-03-02 16:54:49.847] [Tick 6] [DEBUG] Actions: [ActionEnvelope { id: 3, action: MoveTo(Pos((5, 4))) }]
-[2025-03-02 16:54:50.846] [Tick 7] [DEBUG] Processing tick 7
-[2025-03-02 16:54:50.847] [Tick 7] [DEBUG] Current position: Pos((5, 4))
-[2025-03-02 16:54:50.847] [Tick 7] [INFO] Radar scan complete
+[2025-03-03 21:53:11.498] [Tick 6] [DEBUG] ActionResult { action: MoveTo(Pos((5, 3))), id: 2, status: Success }
+[2025-03-03 21:53:11.498] [Tick 6] [DEBUG] Found Crumb
+[2025-03-03 21:53:11.498] [Tick 6] [DEBUG] Actions: [ActionEnvelope { id: 3, action: MoveTo(Pos((5, 4))) }]
+[2025-03-03 21:53:12.497] [Tick 7] [DEBUG] Processing tick 7
+[2025-03-03 21:53:12.497] [Tick 7] [DEBUG] Current position: Pos((5, 4))
+[2025-03-03 21:53:12.497] [Tick 7] [INFO] Radar scan complete
   num_bots = 1
-[2025-03-02 16:54:50.847] [Tick 7] [INFO] Radar for Bot 1 (Tick 7):
-┌──────────────────────┐
-│. . . . . C . . . . . │
-│. . . .   C   . . . . │
-│. . .     C     . . . │
-│. .       C       . . │
-│.         C         . │
-│          P         []│
-│.                   . │
-│. .               . . │
-│. . .           . . . │
-│. . . .       . . . . │
-│[][][][][][][][][][][]│
-└──────────────────────┘
-
-Bots detected:
-  0: Player at Pos(5, 5)
-
-[2025-03-02 16:54:50.847] [Tick 7] [DEBUG] Action Result: ActionResult { action: MoveTo(Pos((5, 4))), id: 3, status: Success }
-[2025-03-02 16:54:50.847] [Tick 7] [DEBUG] Found Crumb
-[2025-03-02 16:54:50.847] [Tick 7] [DEBUG] Actions: [ActionEnvelope { id: 4, action: MoveTo(Pos((5, 5))) }]
-[2025-03-02 16:54:51.846] [Tick 8] [DEBUG] Processing tick 8
-[2025-03-02 16:54:51.846] [Tick 8] [DEBUG] Current position: Pos((5, 5))
-[2025-03-02 16:54:51.846] [Tick 8] [INFO] Radar scan complete
-  num_bots = 1
-[2025-03-02 16:54:51.846] [Tick 8] [INFO] Radar for Bot 1 (Tick 8):
+[2025-03-03 21:53:12.497] [Tick 7] [INFO] Radar for Bot 1 (Tick 7):
 ┌──────────────────────┐
 │. . . . . C . . . . . │
 │. . . .   C   . . . . │
@@ -164,20 +139,20 @@ Bots detected:
 │. .               . . │
 │. . .           . . . │
 │. . . .       . . . . │
-│. . . . .   . . . . . │
+│[][][][][][][][][][][]│
 └──────────────────────┘
 
 Bots detected:
   0: Player at Pos(5, 5)
 
-[2025-03-02 16:54:51.846] [Tick 8] [DEBUG] Action Result: ActionResult { action: MoveTo(Pos((5, 5))), id: 4, status: Success }
-[2025-03-02 16:54:51.846] [Tick 8] [DEBUG] Found Crumb
-[2025-03-02 16:54:51.846] [Tick 8] [DEBUG] Actions: [ActionEnvelope { id: 5, action: MoveTo(Pos((5, 6))) }]
-[2025-03-02 16:54:52.847] [Tick 9] [DEBUG] Processing tick 9
-[2025-03-02 16:54:52.847] [Tick 9] [DEBUG] Current position: Pos((5, 6))
-[2025-03-02 16:54:52.847] [Tick 9] [INFO] Radar scan complete
+[2025-03-03 21:53:12.497] [Tick 7] [DEBUG] ActionResult { action: MoveTo(Pos((5, 4))), id: 3, status: Success }
+[2025-03-03 21:53:12.497] [Tick 7] [DEBUG] Found Crumb
+[2025-03-03 21:53:12.497] [Tick 7] [DEBUG] Actions: [ActionEnvelope { id: 4, action: MoveTo(Pos((5, 5))) }]
+[2025-03-03 21:53:13.498] [Tick 8] [DEBUG] Processing tick 8
+[2025-03-03 21:53:13.498] [Tick 8] [DEBUG] Current position: Pos((5, 5))
+[2025-03-03 21:53:13.498] [Tick 8] [INFO] Radar scan complete
   num_bots = 1
-[2025-03-02 16:54:52.847] [Tick 9] [INFO] Radar for Bot 1 (Tick 9):
+[2025-03-03 21:53:13.498] [Tick 8] [INFO] Radar for Bot 1 (Tick 8):
 ┌──────────────────────┐
 │. . . . . C . . . . . │
 │. . . .   C   . . . . │
@@ -195,14 +170,39 @@ Bots detected:
 Bots detected:
   0: Player at Pos(5, 5)
 
-[2025-03-02 16:54:52.847] [Tick 9] [DEBUG] Action Result: ActionResult { action: MoveTo(Pos((5, 6))), id: 5, status: Success }
-[2025-03-02 16:54:52.847] [Tick 9] [DEBUG] Found Crumb
-[2025-03-02 16:54:52.847] [Tick 9] [DEBUG] Actions: [ActionEnvelope { id: 6, action: MoveTo(Pos((5, 7))) }]
-[2025-03-02 16:54:53.846] [Tick 10] [DEBUG] Processing tick 10
-[2025-03-02 16:54:53.846] [Tick 10] [DEBUG] Current position: Pos((5, 7))
-[2025-03-02 16:54:53.846] [Tick 10] [INFO] Radar scan complete
+[2025-03-03 21:53:13.498] [Tick 8] [DEBUG] ActionResult { action: MoveTo(Pos((5, 5))), id: 4, status: Success }
+[2025-03-03 21:53:13.498] [Tick 8] [DEBUG] Found Crumb
+[2025-03-03 21:53:13.498] [Tick 8] [DEBUG] Actions: [ActionEnvelope { id: 5, action: MoveTo(Pos((5, 6))) }]
+[2025-03-03 21:53:14.484] [Tick 9] [DEBUG] Processing tick 9
+[2025-03-03 21:53:14.484] [Tick 9] [DEBUG] Current position: Pos((5, 6))
+[2025-03-03 21:53:14.484] [Tick 9] [INFO] Radar scan complete
   num_bots = 1
-[2025-03-02 16:54:53.846] [Tick 10] [INFO] Radar for Bot 1 (Tick 10):
+[2025-03-03 21:53:14.484] [Tick 9] [INFO] Radar for Bot 1 (Tick 9):
+┌──────────────────────┐
+│. . . . . C . . . . . │
+│. . . .   C   . . . . │
+│. . .     C     . . . │
+│. .       C       . . │
+│.         C         . │
+│          P         []│
+│.                   . │
+│. .               . . │
+│. . .           . . . │
+│. . . .       . . . . │
+│. . . . .   . . . . . │
+└──────────────────────┘
+
+Bots detected:
+  0: Player at Pos(5, 5)
+
+[2025-03-03 21:53:14.484] [Tick 9] [DEBUG] ActionResult { action: MoveTo(Pos((5, 6))), id: 5, status: Success }
+[2025-03-03 21:53:14.484] [Tick 9] [DEBUG] Found Crumb
+[2025-03-03 21:53:14.484] [Tick 9] [DEBUG] Actions: [ActionEnvelope { id: 6, action: MoveTo(Pos((5, 7))) }]
+[2025-03-03 21:53:15.484] [Tick 10] [DEBUG] Processing tick 10
+[2025-03-03 21:53:15.484] [Tick 10] [DEBUG] Current position: Pos((5, 7))
+[2025-03-03 21:53:15.484] [Tick 10] [INFO] Radar scan complete
+  num_bots = 1
+[2025-03-03 21:53:15.484] [Tick 10] [INFO] Radar for Bot 1 (Tick 10):
 ┌──────────────────────┐
 │. . . . .   . . . . . │
 │. . . .   C C . . . . │
@@ -220,14 +220,14 @@ Bots detected:
 Bots detected:
   0: Player at Pos(5, 5)
 
-[2025-03-02 16:54:53.846] [Tick 10] [DEBUG] Action Result: ActionResult { action: MoveTo(Pos((5, 7))), id: 6, status: Success }
-[2025-03-02 16:54:53.846] [Tick 10] [DEBUG] Found Crumb
-[2025-03-02 16:54:53.846] [Tick 10] [DEBUG] Actions: [ActionEnvelope { id: 7, action: MoveTo(Pos((5, 8))) }]
-[2025-03-02 16:54:54.846] [Tick 11] [DEBUG] Processing tick 11
-[2025-03-02 16:54:54.846] [Tick 11] [DEBUG] Current position: Pos((5, 8))
-[2025-03-02 16:54:54.846] [Tick 11] [INFO] Radar scan complete
+[2025-03-03 21:53:15.484] [Tick 10] [DEBUG] ActionResult { action: MoveTo(Pos((5, 7))), id: 6, status: Success }
+[2025-03-03 21:53:15.484] [Tick 10] [DEBUG] Found Crumb
+[2025-03-03 21:53:15.484] [Tick 10] [DEBUG] Actions: [ActionEnvelope { id: 7, action: MoveTo(Pos((5, 8))) }]
+[2025-03-03 21:53:16.483] [Tick 11] [DEBUG] Processing tick 11
+[2025-03-03 21:53:16.483] [Tick 11] [DEBUG] Current position: Pos((5, 8))
+[2025-03-03 21:53:16.483] [Tick 11] [INFO] Radar scan complete
   num_bots = 1
-[2025-03-02 16:54:54.846] [Tick 11] [INFO] Radar for Bot 1 (Tick 11):
+[2025-03-03 21:53:16.483] [Tick 11] [INFO] Radar for Bot 1 (Tick 11):
 ┌──────────────────────┐
 │. . . . .   . . . . . │
 │. . . .     C . . . . │
@@ -245,14 +245,14 @@ Bots detected:
 Bots detected:
   0: Player at Pos(5, 5)
 
-[2025-03-02 16:54:54.846] [Tick 11] [DEBUG] Action Result: ActionResult { action: MoveTo(Pos((5, 8))), id: 7, status: Success }
-[2025-03-02 16:54:54.847] [Tick 11] [DEBUG] Found Crumb
-[2025-03-02 16:54:54.847] [Tick 11] [DEBUG] Actions: [ActionEnvelope { id: 8, action: MoveTo(Pos((5, 9))) }]
-[2025-03-02 16:54:55.846] [Tick 12] [DEBUG] Processing tick 12
-[2025-03-02 16:54:55.847] [Tick 12] [DEBUG] Current position: Pos((5, 9))
-[2025-03-02 16:54:55.847] [Tick 12] [INFO] Radar scan complete
+[2025-03-03 21:53:16.483] [Tick 11] [DEBUG] ActionResult { action: MoveTo(Pos((5, 8))), id: 7, status: Success }
+[2025-03-03 21:53:16.483] [Tick 11] [DEBUG] Found Crumb
+[2025-03-03 21:53:16.483] [Tick 11] [DEBUG] Actions: [ActionEnvelope { id: 8, action: MoveTo(Pos((5, 9))) }]
+[2025-03-03 21:53:17.500] [Tick 12] [DEBUG] Processing tick 12
+[2025-03-03 21:53:17.500] [Tick 12] [DEBUG] Current position: Pos((5, 9))
+[2025-03-03 21:53:17.500] [Tick 12] [INFO] Radar scan complete
   num_bots = 1
-[2025-03-02 16:54:55.847] [Tick 12] [INFO] Radar for Bot 1 (Tick 12):
+[2025-03-03 21:53:17.500] [Tick 12] [INFO] Radar for Bot 1 (Tick 12):
 ┌──────────────────────┐
 │. . . . .   . . . . . │
 │. . . .     C . . . . │
@@ -270,6 +270,461 @@ Bots detected:
 Bots detected:
   0: Player at Pos(5, 5)
 
-[2025-03-02 16:54:55.847] [Tick 12] [DEBUG] Action Result: ActionResult { action: MoveTo(Pos((5, 9))), id: 8, status: Success }
-[2025-03-02 16:54:55.847] [Tick 12] [DEBUG] Found Crumb
-[2025-03-02 16:54:55.847] [Tick 12] [DEBUG] Actions: [ActionEnvelope { id: 9, action: MoveTo(Pos((5, 10))) }]
+[2025-03-03 21:53:17.500] [Tick 12] [DEBUG] ActionResult { action: MoveTo(Pos((5, 9))), id: 8, status: Success }
+[2025-03-03 21:53:17.500] [Tick 12] [DEBUG] Found Crumb
+[2025-03-03 21:53:17.500] [Tick 12] [DEBUG] Actions: [ActionEnvelope { id: 9, action: MoveTo(Pos((5, 10))) }]
+[2025-03-03 21:53:18.484] [Tick 13] [DEBUG] Processing tick 13
+[2025-03-03 21:53:18.484] [Tick 13] [DEBUG] Current position: Pos((5, 10))
+[2025-03-03 21:53:18.484] [Tick 13] [INFO] Radar scan complete
+  num_bots = 1
+[2025-03-03 21:53:18.484] [Tick 13] [INFO] Radar for Bot 1 (Tick 13):
+┌──────────────────────┐
+│. . . . .   . . . . . │
+│. . . .       . . . . │
+│. . .       C C . . . │
+│. .         C     . . │
+│.         C C       . │
+│          P           │
+│.                   . │
+│. .               . . │
+│. . .           . . . │
+│. . . .       . . . . │
+│. . . . .   . . . . . │
+└──────────────────────┘
+
+Bots detected:
+  0: Player at Pos(5, 5)
+
+[2025-03-03 21:53:18.484] [Tick 13] [DEBUG] ActionResult { action: MoveTo(Pos((5, 10))), id: 9, status: Success }
+[2025-03-03 21:53:18.484] [Tick 13] [DEBUG] Found Crumb
+[2025-03-03 21:53:18.484] [Tick 13] [DEBUG] Actions: [ActionEnvelope { id: 10, action: MoveTo(Pos((5, 11))) }]
+[2025-03-03 21:53:19.483] [Tick 14] [DEBUG] Processing tick 14
+[2025-03-03 21:53:19.483] [Tick 14] [DEBUG] Current position: Pos((5, 11))
+[2025-03-03 21:53:19.483] [Tick 14] [INFO] Radar scan complete
+  num_bots = 1
+[2025-03-03 21:53:19.483] [Tick 14] [INFO] Radar for Bot 1 (Tick 14):
+┌──────────────────────┐
+│[][][][][][][][][][][]│
+│. . . .       . . . . │
+│. . .           . . . │
+│. .         C C C . . │
+│.           C       . │
+│          P C         │
+│.                   . │
+│. .               . . │
+│. . .           . . . │
+│. . . .       . . . . │
+│. . . . .   . . . . . │
+└──────────────────────┘
+
+Bots detected:
+  0: Player at Pos(5, 5)
+
+[2025-03-03 21:53:19.483] [Tick 14] [DEBUG] ActionResult { action: MoveTo(Pos((5, 11))), id: 10, status: Success }
+[2025-03-03 21:53:19.483] [Tick 14] [DEBUG] Found Crumb
+[2025-03-03 21:53:19.483] [Tick 14] [DEBUG] Actions: [ActionEnvelope { id: 11, action: MoveTo(Pos((6, 11))) }]
+[2025-03-03 21:53:20.499] [Tick 15] [DEBUG] Processing tick 15
+[2025-03-03 21:53:20.499] [Tick 15] [DEBUG] Current position: Pos((6, 11))
+[2025-03-03 21:53:20.499] [Tick 15] [INFO] Radar scan complete
+  num_bots = 1
+[2025-03-03 21:53:20.499] [Tick 15] [INFO] Radar for Bot 1 (Tick 15):
+┌──────────────────────┐
+│[][][][][][][][][][][]│
+│. . . .       . . . . │
+│. . .         F . . . │
+│. .       C C C   . . │
+│.         C         . │
+│          P           │
+│.                   . │
+│. .               . . │
+│. . .           . . . │
+│. . . .       . . . . │
+│. . . . .   . . . . . │
+└──────────────────────┘
+
+Bots detected:
+  0: Player at Pos(5, 5)
+
+[2025-03-03 21:53:20.499] [Tick 15] [DEBUG] ActionResult { action: MoveTo(Pos((6, 11))), id: 11, status: Success }
+[2025-03-03 21:53:20.499] [Tick 15] [DEBUG] Found Crumb
+[2025-03-03 21:53:20.499] [Tick 15] [DEBUG] Actions: [ActionEnvelope { id: 12, action: MoveTo(Pos((6, 12))) }]
+[2025-03-03 21:53:21.484] [Tick 16] [DEBUG] Processing tick 16
+[2025-03-03 21:53:21.484] [Tick 16] [DEBUG] Current position: Pos((6, 12))
+[2025-03-03 21:53:21.484] [Tick 16] [INFO] Radar scan complete
+  num_bots = 1
+[2025-03-03 21:53:21.484] [Tick 16] [INFO] Radar for Bot 1 (Tick 16):
+┌──────────────────────┐
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│. . .           . . . │
+│. .           F   . . │
+│.         C C C     . │
+│          P           │
+│.                   . │
+│. .               . . │
+│. . .           . . . │
+│. . . .       . . . . │
+│. . . . .   . . . . . │
+└──────────────────────┘
+
+Bots detected:
+  0: Player at Pos(5, 5)
+
+[2025-03-03 21:53:21.484] [Tick 16] [DEBUG] ActionResult { action: MoveTo(Pos((6, 12))), id: 12, status: Success }
+[2025-03-03 21:53:21.484] [Tick 16] [DEBUG] Found Crumb
+[2025-03-03 21:53:21.484] [Tick 16] [DEBUG] Actions: [ActionEnvelope { id: 13, action: MoveTo(Pos((6, 13))) }]
+[2025-03-03 21:53:22.483] [Tick 17] [DEBUG] Processing tick 17
+[2025-03-03 21:53:22.483] [Tick 17] [DEBUG] Current position: Pos((6, 13))
+[2025-03-03 21:53:22.483] [Tick 17] [INFO] Radar scan complete
+  num_bots = 1
+[2025-03-03 21:53:22.483] [Tick 17] [INFO] Radar for Bot 1 (Tick 17):
+┌──────────────────────┐
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│. .               . . │
+│.             F     . │
+│          P C C       │
+│.                   . │
+│. .               . . │
+│. . .           . . . │
+│. . . .       . . . . │
+│. . . . .   . . . . . │
+└──────────────────────┘
+
+Bots detected:
+  0: Player at Pos(5, 5)
+
+[2025-03-03 21:53:22.483] [Tick 17] [DEBUG] ActionResult { action: MoveTo(Pos((6, 13))), id: 13, status: Success }
+[2025-03-03 21:53:22.483] [Tick 17] [DEBUG] Found Crumb
+[2025-03-03 21:53:22.483] [Tick 17] [DEBUG] Actions: [ActionEnvelope { id: 14, action: MoveTo(Pos((7, 13))) }]
+[2025-03-03 21:53:23.498] [Tick 18] [DEBUG] Processing tick 18
+[2025-03-03 21:53:23.498] [Tick 18] [DEBUG] Current position: Pos((7, 13))
+[2025-03-03 21:53:23.498] [Tick 18] [INFO] Radar scan complete
+  num_bots = 1
+[2025-03-03 21:53:23.498] [Tick 18] [INFO] Radar for Bot 1 (Tick 18):
+┌──────────────────────┐
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│. .               . . │
+│.           F       . │
+│          P C         │
+│.                   . │
+│. .               . . │
+│. . .           . . . │
+│. . . .       . . . . │
+│. . . . .   . . . . . │
+└──────────────────────┘
+
+Bots detected:
+  0: Player at Pos(5, 5)
+
+[2025-03-03 21:53:23.498] [Tick 18] [DEBUG] ActionResult { action: MoveTo(Pos((7, 13))), id: 14, status: Success }
+[2025-03-03 21:53:23.498] [Tick 18] [DEBUG] Found Crumb
+[2025-03-03 21:53:23.498] [Tick 18] [DEBUG] Actions: [ActionEnvelope { id: 15, action: MoveTo(Pos((8, 13))) }]
+[2025-03-03 21:53:24.482] [Tick 19] [DEBUG] Processing tick 19
+[2025-03-03 21:53:24.482] [Tick 19] [DEBUG] Current position: Pos((8, 13))
+[2025-03-03 21:53:24.482] [Tick 19] [INFO] Radar scan complete
+  num_bots = 1
+[2025-03-03 21:53:24.482] [Tick 19] [INFO] Radar for Bot 1 (Tick 19):
+┌──────────────────────┐
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│. .               . . │
+│.         F         . │
+│          P           │
+│.                   . │
+│. .               . . │
+│. . .           . . . │
+│. . . .       . . . . │
+│. . . . .   . . . . . │
+└──────────────────────┘
+
+Bots detected:
+  0: Player at Pos(5, 5)
+
+[2025-03-03 21:53:24.482] [Tick 19] [DEBUG] ActionResult { action: MoveTo(Pos((8, 13))), id: 15, status: Success }
+[2025-03-03 21:53:24.482] [Tick 19] [DEBUG] Found Fent
+[2025-03-03 21:53:24.482] [Tick 19] [DEBUG] Actions: [ActionEnvelope { id: 16, action: MoveDir(Up) }]
+[2025-03-03 21:53:25.484] [Tick 20] [DEBUG] Processing tick 20
+[2025-03-03 21:53:25.484] [Tick 20] [DEBUG] Current position: Pos((8, 14))
+[2025-03-03 21:53:25.484] [Tick 20] [INFO] Radar scan complete
+  num_bots = 1
+[2025-03-03 21:53:25.484] [Tick 20] [INFO] Radar for Bot 1 (Tick 20):
+┌──────────────────────┐
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│.                   . │
+│          P           │
+│.                   . │
+│. .               . . │
+│. . .           . . . │
+│. . . .       . . . . │
+│. . . . .   . . . . . │
+└──────────────────────┘
+
+Bots detected:
+  0: Player at Pos(5, 5)
+
+[2025-03-03 21:53:25.484] [Tick 20] [DEBUG] ActionResult { action: MoveDir(Up), id: 16, status: Success }
+[2025-03-03 21:53:25.484] [Tick 20] [DEBUG] No adjacent Fent or Crumb, moving to default dir
+[2025-03-03 21:53:25.484] [Tick 20] [DEBUG] Actions: [ActionEnvelope { id: 17, action: MoveDir(Up) }]
+[2025-03-03 21:53:26.498] [Tick 21] [DEBUG] Processing tick 21
+[2025-03-03 21:53:26.499] [Tick 21] [DEBUG] Current position: Pos((8, 15))
+[2025-03-03 21:53:26.499] [Tick 21] [INFO] Radar scan complete
+  num_bots = 1
+[2025-03-03 21:53:26.499] [Tick 21] [INFO] Radar for Bot 1 (Tick 21):
+┌──────────────────────┐
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│          P           │
+│.                   . │
+│. .               . . │
+│. . .           . . . │
+│. . . .       . . . . │
+│. . . . .   . . . . . │
+└──────────────────────┘
+
+Bots detected:
+  0: Player at Pos(5, 5)
+
+[2025-03-03 21:53:26.499] [Tick 21] [DEBUG] ActionResult { action: MoveDir(Up), id: 17, status: Success }
+[2025-03-03 21:53:26.499] [Tick 21] [DEBUG] Changing default dir
+[2025-03-03 21:53:26.499] [Tick 21] [DEBUG] No adjacent Fent or Crumb, moving to default dir
+[2025-03-03 21:53:26.499] [Tick 21] [DEBUG] Actions: [ActionEnvelope { id: 18, action: MoveDir(Right) }]
+[2025-03-03 21:53:27.499] [Tick 22] [DEBUG] Processing tick 22
+[2025-03-03 21:53:27.499] [Tick 22] [DEBUG] Current position: Pos((9, 15))
+[2025-03-03 21:53:27.499] [Tick 22] [INFO] Radar scan complete
+  num_bots = 1
+[2025-03-03 21:53:27.499] [Tick 22] [INFO] Radar for Bot 1 (Tick 22):
+┌──────────────────────┐
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│          P           │
+│.                   . │
+│. .               . . │
+│. . .           . . . │
+│. . . .       . . . . │
+│. . . . .   . . . . . │
+└──────────────────────┘
+
+Bots detected:
+  0: Player at Pos(5, 5)
+
+[2025-03-03 21:53:27.499] [Tick 22] [DEBUG] ActionResult { action: MoveDir(Right), id: 18, status: Success }
+[2025-03-03 21:53:27.499] [Tick 22] [DEBUG] Changing default dir
+[2025-03-03 21:53:27.499] [Tick 22] [DEBUG] No adjacent Fent or Crumb, moving to default dir
+[2025-03-03 21:53:27.499] [Tick 22] [DEBUG] Actions: [ActionEnvelope { id: 19, action: MoveDir(Left) }]
+[2025-03-03 21:53:28.482] [Tick 23] [DEBUG] Processing tick 23
+[2025-03-03 21:53:28.482] [Tick 23] [DEBUG] Current position: Pos((8, 15))
+[2025-03-03 21:53:28.482] [Tick 23] [INFO] Radar scan complete
+  num_bots = 1
+[2025-03-03 21:53:28.482] [Tick 23] [INFO] Radar for Bot 1 (Tick 23):
+┌──────────────────────┐
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│          P           │
+│.                   . │
+│. .               . . │
+│. . .           . . . │
+│. . . .       . . . . │
+│. . . . .   . . . . . │
+└──────────────────────┘
+
+Bots detected:
+  0: Player at Pos(5, 5)
+
+[2025-03-03 21:53:28.482] [Tick 23] [DEBUG] ActionResult { action: MoveDir(Left), id: 19, status: Success }
+[2025-03-03 21:53:28.482] [Tick 23] [DEBUG] No adjacent Fent or Crumb, moving to default dir
+[2025-03-03 21:53:28.482] [Tick 23] [DEBUG] Actions: [ActionEnvelope { id: 20, action: MoveDir(Left) }]
+[2025-03-03 21:53:29.484] [Tick 24] [DEBUG] Processing tick 24
+[2025-03-03 21:53:29.484] [Tick 24] [DEBUG] Current position: Pos((7, 15))
+[2025-03-03 21:53:29.484] [Tick 24] [INFO] Radar scan complete
+  num_bots = 1
+[2025-03-03 21:53:29.484] [Tick 24] [INFO] Radar for Bot 1 (Tick 24):
+┌──────────────────────┐
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│          P           │
+│.                   . │
+│. .               . . │
+│. . .           . . . │
+│. . . .       . . . . │
+│. . . . .   . . . . . │
+└──────────────────────┘
+
+Bots detected:
+  0: Player at Pos(5, 5)
+
+[2025-03-03 21:53:29.484] [Tick 24] [DEBUG] ActionResult { action: MoveDir(Left), id: 20, status: Success }
+[2025-03-03 21:53:29.484] [Tick 24] [DEBUG] No adjacent Fent or Crumb, moving to default dir
+[2025-03-03 21:53:29.484] [Tick 24] [DEBUG] Actions: [ActionEnvelope { id: 21, action: MoveDir(Left) }]
+[2025-03-03 21:53:30.484] [Tick 25] [DEBUG] Processing tick 25
+[2025-03-03 21:53:30.484] [Tick 25] [DEBUG] Current position: Pos((6, 15))
+[2025-03-03 21:53:30.484] [Tick 25] [INFO] Radar scan complete
+  num_bots = 1
+[2025-03-03 21:53:30.484] [Tick 25] [INFO] Radar for Bot 1 (Tick 25):
+┌──────────────────────┐
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│          P           │
+│.                   . │
+│. .               . . │
+│. . .           . . . │
+│. . . .       . . . . │
+│. . . . .   . . . . . │
+└──────────────────────┘
+
+Bots detected:
+  0: Player at Pos(5, 5)
+
+[2025-03-03 21:53:30.484] [Tick 25] [DEBUG] ActionResult { action: MoveDir(Left), id: 21, status: Success }
+[2025-03-03 21:53:30.484] [Tick 25] [DEBUG] Changing default dir
+[2025-03-03 21:53:30.484] [Tick 25] [DEBUG] No adjacent Fent or Crumb, moving to default dir
+[2025-03-03 21:53:30.484] [Tick 25] [DEBUG] Actions: [ActionEnvelope { id: 22, action: MoveDir(Up) }]
+[2025-03-03 21:53:31.483] [Tick 26] [DEBUG] Processing tick 26
+[2025-03-03 21:53:31.483] [Tick 26] [DEBUG] Current position: Pos((6, 15))
+[2025-03-03 21:53:31.483] [Tick 26] [INFO] Radar scan complete
+  num_bots = 1
+[2025-03-03 21:53:31.483] [Tick 26] [INFO] Radar for Bot 1 (Tick 26):
+┌──────────────────────┐
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│          P           │
+│.                   . │
+│. .               . . │
+│. . .           . . . │
+│. . . .       . . . . │
+│. . . . .   . . . . . │
+└──────────────────────┘
+
+Bots detected:
+  0: Player at Pos(5, 5)
+
+[2025-03-03 21:53:31.483] [Tick 26] [DEBUG] ActionResult { action: MoveDir(Up), id: 22, status: Failure }
+[2025-03-03 21:53:31.483] [Tick 26] [DEBUG] Changing default dir
+[2025-03-03 21:53:31.483] [Tick 26] [DEBUG] No adjacent Fent or Crumb, moving to default dir
+[2025-03-03 21:53:31.483] [Tick 26] [DEBUG] Actions: [ActionEnvelope { id: 23, action: MoveDir(Down) }]
+[2025-03-03 21:53:32.484] [Tick 27] [DEBUG] Processing tick 27
+[2025-03-03 21:53:32.485] [Tick 27] [DEBUG] Current position: Pos((6, 14))
+[2025-03-03 21:53:32.485] [Tick 27] [INFO] Radar scan complete
+  num_bots = 1
+[2025-03-03 21:53:32.485] [Tick 27] [INFO] Radar for Bot 1 (Tick 27):
+┌──────────────────────┐
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│.                   . │
+│          P           │
+│.                   . │
+│. .               . . │
+│. . .           . . . │
+│. . . .       . . . . │
+│. . . . .   . . . . . │
+└──────────────────────┘
+
+Bots detected:
+  0: Player at Pos(5, 5)
+
+[2025-03-03 21:53:32.485] [Tick 27] [DEBUG] ActionResult { action: MoveDir(Down), id: 23, status: Success }
+[2025-03-03 21:53:32.485] [Tick 27] [DEBUG] Changing default dir
+[2025-03-03 21:53:32.485] [Tick 27] [DEBUG] No adjacent Fent or Crumb, moving to default dir
+[2025-03-03 21:53:32.485] [Tick 27] [DEBUG] Actions: [ActionEnvelope { id: 24, action: MoveDir(Down) }]
+[2025-03-03 21:53:33.486] [Tick 28] [DEBUG] Processing tick 28
+[2025-03-03 21:53:33.486] [Tick 28] [DEBUG] Current position: Pos((6, 13))
+[2025-03-03 21:53:33.486] [Tick 28] [INFO] Radar scan complete
+  num_bots = 1
+[2025-03-03 21:53:33.486] [Tick 28] [INFO] Radar for Bot 1 (Tick 28):
+┌──────────────────────┐
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│. .               . . │
+│.                   . │
+│          P           │
+│.                   . │
+│. .               . . │
+│. . .           . . . │
+│. . . .       . . . . │
+│. . . . .   . . . . . │
+└──────────────────────┘
+
+Bots detected:
+  0: Player at Pos(5, 5)
+
+[2025-03-03 21:53:33.486] [Tick 28] [DEBUG] ActionResult { action: MoveDir(Down), id: 24, status: Success }
+[2025-03-03 21:53:33.486] [Tick 28] [DEBUG] Changing default dir
+[2025-03-03 21:53:33.486] [Tick 28] [DEBUG] No adjacent Fent or Crumb, moving to default dir
+[2025-03-03 21:53:33.486] [Tick 28] [DEBUG] Actions: [ActionEnvelope { id: 25, action: MoveDir(Up) }]
+[2025-03-03 21:53:34.492] [Tick 29] [DEBUG] Processing tick 29
+[2025-03-03 21:53:34.492] [Tick 29] [DEBUG] Current position: Pos((6, 14))
+[2025-03-03 21:53:34.492] [Tick 29] [INFO] Radar scan complete
+  num_bots = 1
+[2025-03-03 21:53:34.492] [Tick 29] [INFO] Radar for Bot 1 (Tick 29):
+┌──────────────────────┐
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│.                   . │
+│          P           │
+│.                   . │
+│. .               . . │
+│. . .           . . . │
+│. . . .       . . . . │
+│. . . . .   . . . . . │
+└──────────────────────┘
+
+Bots detected:
+  0: Player at Pos(5, 5)
+
+[2025-03-03 21:53:34.492] [Tick 29] [DEBUG] ActionResult { action: MoveDir(Up), id: 25, status: Success }
+[2025-03-03 21:53:34.492] [Tick 29] [DEBUG] No adjacent Fent or Crumb, moving to default dir
+[2025-03-03 21:53:34.492] [Tick 29] [DEBUG] Actions: [ActionEnvelope { id: 26, action: MoveDir(Up) }]
+[2025-03-03 21:53:35.488] [Tick 30] [DEBUG] Processing tick 30
+[2025-03-03 21:53:35.488] [Tick 30] [DEBUG] Current position: Pos((6, 15))
+[2025-03-03 21:53:35.488] [Tick 30] [INFO] Radar scan complete
+  num_bots = 1
+[2025-03-03 21:53:35.488] [Tick 30] [INFO] Radar for Bot 1 (Tick 30):
+┌──────────────────────┐
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│[][][][][][][][][][][]│
+│          P           │
+│.                   . │
+│. .               . . │
+│. . .           . . . │
+│. . . .       . . . . │
+│. . . . .   . . . . . │
+└──────────────────────┘
+
+Bots detected:
+  0: Player at Pos(5, 5)
+
+[2025-03-03 21:53:35.488] [Tick 30] [DEBUG] ActionResult { action: MoveDir(Up), id: 26, status: Success }
+[2025-03-03 21:53:35.488] [Tick 30] [DEBUG] Changing default dir

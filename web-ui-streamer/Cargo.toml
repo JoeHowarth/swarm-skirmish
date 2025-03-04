@@ -1,0 +1,28 @@
+[package]
+name = "web-ui-streamer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+eyre = "0.6"
+tokio = { version = "1", features = [
+    "rt",
+    "net",
+    "time",
+    "macros",
+], default-features = false }
+axum = { version = "0.8.1", features = ["ws"] }
+axum-extra = { version = "0.10.0", features = ["typed-header"] }
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+futures.workspace = true
+tower-http = { version = "0.6.2", features = ["fs", "trace", "cors"] }
+tracing = "0.1.41"
+swarm-lib = { path = "../swarm-lib" }
+async-channel = "2.3.1"
+notify = { version = "8.0.0", features = ["macos_kqueue"] }
+dashmap = "6.1.0"
+
+[dev-dependencies]
+tokio-tungstenite = "0.26.2"

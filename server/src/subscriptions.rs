@@ -14,7 +14,7 @@ use swarm_lib::{
 
 use crate::{
     actions::InProgressAction,
-    core::{CellKind, Tick},
+    core::{CellKind, Inventory, Tick},
     gridworld::GridWorld,
     server::{BotId, BotIdToEntity, ServerUpdates, SubscriptionRecv},
 };
@@ -53,10 +53,10 @@ fn handle_bot_subscriptions(
 fn send_server_updates(
     update_tx: Res<ServerUpdates>,
     tick: Res<Tick>,
-    query: Query<(&BotId, &Pos, &Team, &Subscriptions, &InProgressAction)>,
+    query: Query<(&BotId, &Pos, &Team, &Subscriptions, &InProgressAction, &Inventory)>,
     grid_world: Res<GridWorld>,
 ) {
-    for (bot_id, pos, team, subscriptions, in_progress_action) in query.iter() {
+    for (bot_id, pos, team, subscriptions, in_progress_action, inventory) in query.iter() {
         let update = ServerUpdateEnvelope {
             bot_id: bot_id.0,
             seq: 0,
@@ -76,6 +76,7 @@ fn send_server_updates(
                     .get(&SubscriptionType::Radar)
                     .map(|_| create_radar_data(pos, &grid_world, &query)),
                 action_result: in_progress_action.opt.clone(),
+                items: inventory.0.clone(),
             },
         };
 
@@ -86,7 +87,7 @@ fn send_server_updates(
 fn create_radar_data(
     pos: &Pos,
     grid_world: &GridWorld,
-    query: &Query<(&BotId, &Pos, &Team, &Subscriptions, &InProgressAction)>,
+    query: &Query<(&BotId, &Pos, &Team, &Subscriptions, &InProgressAction, &Inventory)>,
 ) -> RadarData {
     // Create a radar with a 11x11 grid centered on the bot
     let radar_size = 11;
@@ -130,7 +131,7 @@ fn create_radar_data(
                     CellKind::Blocked => CellKindRadar::Blocked,
                 },
                 pawn: cell.pawn.map(|e| {
-                    let (bot_id, _, &team, _, _) = query.get(e).unwrap();
+                    let (bot_id, _, &team, _, _, _) = query.get(e).unwrap();
 
                     // Store the bot's position in radar coordinates
                     radar.bots.push(RadarBotData {

@@ -1,5 +1,5 @@
 [workspace]
-members = ["server", "simple-bot", "swarm-lib"]
+members = ["server", "simple-bot", "swarm-lib", "web-ui-streamer"]
 resolver = "2"
 
 
