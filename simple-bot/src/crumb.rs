@@ -10,7 +10,7 @@ use swarm_lib::{
     Action,
     ActionStatus,
     BotResponse,
-    CellKindRadar,
+    CellKind,
     CellStateRadar,
     Dir,
     Item::{self, *},
@@ -50,19 +50,23 @@ impl BotUpdate for CrumbFollower {
             self.ctx.debug("Found Fent");
             Action::MoveDir(dir)
         } else {
-            if let Some(((rel_x, rel_y), cell)) =
-                radar.find(CellStateRadar::has_item(Crumb))
+            if let Some((_, cell)) = radar.find(CellStateRadar::has_item(Crumb))
             {
-                self.ctx.debug(format!("Found Crumb at world position: {}", cell.pos));
+                self.ctx.debug(format!(
+                    "Found Crumb at world position: {}",
+                    cell.pos
+                ));
 
                 Action::MoveTo(cell.pos)
             } else {
                 // Generally moves in a consistent direction, but small chance
                 // to change directions or change if going to hit wall
                 if self.rng.random_bool(0.2)
-                    || radar.get_dir(self.default_dir)
+                    || radar
+                        .get_dir(self.default_dir)
                         .map(|cell| cell.kind)
-                        .unwrap_or(CellKindRadar::Blocked) == CellKindRadar::Blocked
+                        .unwrap_or(CellKind::Blocked)
+                        == CellKind::Blocked
                 {
                     self.ctx.debug("Changing default dir");
                     self.default_dir =

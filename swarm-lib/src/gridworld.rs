@@ -1,15 +1,14 @@
 use array2d::Array2D;
-use bevy::prelude::*;
-use swarm_lib::Pos;
+use bevy_ecs::system::Resource;
 
-use crate::core::{CellKind, CellState};
+use crate::Pos;
 
 #[derive(Resource)]
-pub struct GridWorld {
+pub struct GridWorld<CellState> {
     pub grid: Array2D<CellState>,
 }
 
-impl GridWorld {
+impl<CellState: PassableCell> GridWorld<CellState> {
     pub fn new(width: usize, height: usize) -> Self {
         Self {
             grid: Array2D::filled_with(CellState::default(), width, height),
@@ -25,12 +24,12 @@ impl GridWorld {
             .find_path(self, start, goal)
     }
 
-    pub fn get_pos(&self, pos: Pos) -> CellState {
+    pub fn get_pos(&self, pos: Pos) -> &CellState {
         self.get(pos.x(), pos.y())
     }
 
-    pub fn get(&self, x: usize, y: usize) -> CellState {
-        *self.grid.get(x, y).unwrap()
+    pub fn get(&self, x: usize, y: usize) -> &CellState {
+        self.grid.get(x, y).unwrap()
     }
 
     pub fn get_pos_mut(&mut self, pos: Pos) -> &mut CellState {
@@ -121,6 +120,10 @@ pub struct PathFinder {
     height: usize,
 }
 
+pub trait PassableCell: Clone + Default {
+    fn is_blocked(&self) -> bool;
+}
+
 impl PathFinder {
     pub fn new(width: usize, height: usize) -> Self {
         Self {
@@ -152,9 +155,9 @@ impl PathFinder {
         path
     }
 
-    pub fn find_path(
+    pub fn find_path<T: PassableCell>(
         &mut self,
-        grid: &GridWorld,
+        grid: &GridWorld<T>,
         start: impl Into<Pos>,
         goal: impl Into<Pos>,
     ) -> Option<Vec<Pos>> {
@@ -215,9 +218,7 @@ impl PathFinder {
             // Check neighbors (using nearby with distance 1)
             for ((nx, ny), state) in grid.nearby(current.0, current.1, 1) {
                 // Skip if neighbor is blocked or already evaluated
-                if state.kind == CellKind::Blocked
-                    || closed_set.contains(&(nx, ny))
-                {
+                if state.is_blocked() || closed_set.contains(&(nx, ny)) {
                     continue;
                 }
 
@@ -249,14 +250,25 @@ impl PathFinder {
 mod tests {
     use super::*;
 
-    fn create_test_grid() -> GridWorld {
+    #[derive(Clone, Default)]
+    struct Cell {
+        is_blocked: bool,
+    }
+
+    impl PassableCell for Cell {
+        fn is_blocked(&self) -> bool {
+            self.is_blocked
+        }
+    }
+
+    fn create_test_grid() -> GridWorld<Cell> {
         // Create a 5x5 grid for testing
         let mut grid = GridWorld::new(5, 5);
 
         // Fill with unique values to make testing easier
         for x in 0..5 {
             for y in 0..5 {
-                grid.set(x, y, CellState::default());
+                grid.set(x, y, Default::default());
             }
         }
         grid
@@ -321,7 +333,7 @@ mod tests {
         assert_eq!(path.len(), 5); // Should be [(0,0), (1,0), (2,0), (2,1), (2,2)]
 
         // Add some obstacles and test path around them
-        grid.set(1, 1, CellState::blocked());
+        grid.set(1, 1, Cell { is_blocked: true });
         let path = pathfinder
             .find_path(&grid, (0, 0), (2, 2))
             .expect("Should find a path");
@@ -333,10 +345,12 @@ mod tests {
         let mut grid = GridWorld::new(3, 3);
         let mut pathfinder = PathFinder::new(3, 3);
 
+        let blocked = Cell { is_blocked: true };
+
         // Create a wall of blocked cells
-        grid.set(1, 0, CellState::blocked());
-        grid.set(1, 1, CellState::blocked());
-        grid.set(1, 2, CellState::blocked());
+        grid.set(1, 0, blocked.clone());
+        grid.set(1, 1, blocked.clone());
+        grid.set(1, 2, blocked);
 
         // Try to find path through wall
         let path = pathfinder.find_path(&grid, (0, 1), (2, 1));

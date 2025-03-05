@@ -1,9 +1,13 @@
 use bevy::{asset::RenderAssetUsages, prelude::*};
 use bevy_ecs_tilemap::prelude::*;
 use image::DynamicImage;
-use swarm_lib::Team;
+use swarm_lib::{CellKind, Team};
 
-use crate::{core::CellKind, gridworld::GridWorld, CellState, Item};
+use crate::{
+    core::{Inventory, SGridWorld as GridWorld, Tick},
+    CellState,
+    Item,
+};
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
 pub struct TilemapSystemSet;
@@ -51,6 +55,7 @@ impl CellRender {
         match state.kind {
             CellKind::Empty => CellRender::Empty,
             CellKind::Blocked => CellRender::Blocked,
+            CellKind::Unknown => unreachable!(),
         }
     }
 }

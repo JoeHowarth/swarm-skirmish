@@ -4728,6 +4728,7 @@ checksum = "ce5d813d71d82c4cbc1742135004e4a79fd870214c155443451c139c9470a0aa"
 name = "swarm-lib"
 version = "0.1.0"
 dependencies = [
+ "array2d",
  "bevy_ecs",
  "bevy_math",
  "bevy_utils",

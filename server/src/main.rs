@@ -1,12 +1,18 @@
 #![allow(unused_imports)]
 #![feature(mpmc_channel)]
 
-use core::{CellState, CorePlugin, CoreSystemsSet, Inventory, PawnKind};
+use core::{
+    CellState,
+    CorePlugin,
+    CoreSystemsSet,
+    Inventory,
+    PawnKind,
+    SGridWorld as GridWorld,
+};
 use std::time::Duration;
 
 use actions::{ActionsPlugin, ActionsSystemSet};
 use bevy::{prelude::*, time::common_conditions::on_timer};
-use gridworld::GridWorld;
 use server::{BotHandlerPlugin, BotId, ServerSystems};
 use subscriptions::{SubscriptionsPlugin, SubscriptionsSystemSet};
 use swarm_lib::{Item, Pos, Team};
@@ -14,7 +20,6 @@ use tilemap::TilemapSystemSet;
 
 mod actions;
 mod core;
-mod gridworld;
 mod server;
 mod subscriptions;
 mod tilemap;

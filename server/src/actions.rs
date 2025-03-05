@@ -12,8 +12,7 @@ use swarm_lib::{
 };
 
 use crate::{
-    core::Tick,
-    gridworld::GridWorld,
+    core::{SGridWorld, Tick},
     server::{ActionRecv, BotId, BotIdToEntity},
     Pos,
 };
@@ -92,7 +91,7 @@ fn handle_bot_actions(
         &mut InProgressAction,
         &mut ComputedActionQueue,
     )>,
-    grid_world: Res<GridWorld>,
+    grid_world: Res<SGridWorld>,
 ) {
     for (bot_id, pos, mut incoming, mut in_progress, mut computed) in
         query.iter_mut()
@@ -183,7 +182,7 @@ fn process_computed_action(
         &mut InProgressAction,
         &mut ComputedActionQueue,
     )>,
-    mut grid_world: ResMut<GridWorld>,
+    mut grid_world: ResMut<SGridWorld>,
 ) {
     for (entity, _id, mut pos, mut in_progress, mut computed_queue) in
         query.iter_mut()
@@ -223,7 +222,7 @@ fn handle_movement(
     entity: Entity,
     dir: Dir,
     pos: &mut Pos,
-    grid_world: &mut ResMut<GridWorld>,
+    grid_world: &mut ResMut<SGridWorld>,
 ) -> bool {
     // Compute new position and bounds check
     let new_pos = *pos + dir.to_deltas();

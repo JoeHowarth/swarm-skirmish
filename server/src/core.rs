@@ -2,9 +2,12 @@ use std::fmt::Write;
 
 use bevy::{prelude::*, utils::HashMap};
 use strum_macros::Display;
-use swarm_lib::{Item, Pos};
+use swarm_lib::{
+    gridworld::{GridWorld, PassableCell}, CellKind, Item, Pos
+};
 
-use crate::{gridworld::GridWorld, server::BotId};
+use crate::server::BotId;
+pub type SGridWorld = GridWorld<CellState>;
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
 pub struct CoreSystemsSet;
@@ -67,11 +70,10 @@ impl CellState {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum CellKind {
-    #[default]
-    Empty,
-    Blocked,
+impl PassableCell for CellState {
+    fn is_blocked(&self) -> bool {
+        !self.can_enter()
+    }
 }
 
 fn update_tick(mut tick: ResMut<Tick>) {
@@ -83,7 +85,7 @@ fn update_tick(mut tick: ResMut<Tick>) {
 pub struct Inventory(pub HashMap<Item, u32>);
 
 fn pickup_crumbs(
-    mut grid_world: ResMut<GridWorld>,
+    mut grid_world: ResMut<SGridWorld>,
     mut pawns: Query<(&PawnKind, &BotId, &mut Inventory, &Pos)>,
 ) {
     for (pawn_kind, bot_id, mut inventory, pos) in pawns.iter_mut() {
@@ -97,7 +99,7 @@ fn pickup_crumbs(
 }
 
 fn pickup_fent(
-    mut grid_world: ResMut<GridWorld>,
+    mut grid_world: ResMut<SGridWorld>,
     mut pawns: Query<(&PawnKind, &BotId, &mut Inventory, &Pos)>,
 ) {
     for (pawn_kind, bot_id, mut inventory, pos) in pawns.iter_mut() {

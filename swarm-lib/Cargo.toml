@@ -17,3 +17,4 @@ bevy_math = { version = "0.15", features = ["serialize"] }
 # Removed array2d dependency as we now use Vec<CellStateRadar> instead
 rand = { version = "0.9", features = ["small_rng"] }
 bevy_utils = "0.15"
+array2d = { workspace = true }

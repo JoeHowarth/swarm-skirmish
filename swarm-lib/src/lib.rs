@@ -7,6 +7,7 @@ use strum_macros::Display;
 pub mod bot_harness;
 pub mod protocol;
 pub mod types;
+pub mod gridworld;
 
 pub use types::*;
 

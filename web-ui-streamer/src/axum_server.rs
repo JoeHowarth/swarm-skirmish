@@ -145,7 +145,7 @@ async fn ws_handler(
 
 /// Actual websocket statemachine (one will be spawned per connection)
 async fn handle_socket(
-    mut socket: WebSocket,
+    socket: WebSocket,
     who: SocketAddr,
     journal_rx: Receiver<JournalEntry>,
 ) {

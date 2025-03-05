@@ -17,7 +17,7 @@ pub struct RadarBotData {
 #[derive(
     Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Default,
 )]
-pub enum CellKindRadar {
+pub enum CellKind {
     #[default]
     Unknown,
     Empty,
@@ -26,7 +26,7 @@ pub enum CellKindRadar {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CellStateRadar {
-    pub kind: CellKindRadar,
+    pub kind: CellKind,
     pub pawn: Option<usize>,
     pub item: Option<Item>,
     pub pos: Pos, // Added world position to each cell
@@ -67,7 +67,11 @@ impl RadarData {
 
     /// Get a cell by relative coordinates
     /// Returns None if no cell exists at those coordinates
-    pub fn get_relative(&self, rel_x: isize, rel_y: isize) -> Option<&CellStateRadar> {
+    pub fn get_relative(
+        &self,
+        rel_x: isize,
+        rel_y: isize,
+    ) -> Option<&CellStateRadar> {
         let target_pos = self.rel_to_world(rel_x, rel_y);
         self.cells.iter().find(|cell| cell.pos == target_pos)
     }
@@ -104,7 +108,8 @@ impl RadarData {
         self.cells.iter_mut().find(|cell| cell.pos == target_pos)
     }
 
-    /// Filter cells based on a predicate, returning iterator of (rel_coords, cell_ref) pairs
+    /// Filter cells based on a predicate, returning iterator of (rel_coords,
+    /// cell_ref) pairs
     pub fn filter<F>(
         &self,
         filter: F,
@@ -145,9 +150,11 @@ impl RadarData {
         }
 
         // Sort by Manhattan distance and return the closest
-        matching_cells.into_iter().min_by_key(|((rel_x, rel_y), _)| {
-            rel_x.abs() + rel_y.abs() // Manhattan distance
-        })
+        matching_cells
+            .into_iter()
+            .min_by_key(|((rel_x, rel_y), _)| {
+                rel_x.abs() + rel_y.abs() // Manhattan distance
+            })
     }
 }
 

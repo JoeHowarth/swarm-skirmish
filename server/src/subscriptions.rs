@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use swarm_lib::{
-    CellKindRadar,
+    CellKind,
     CellStateRadar,
     Pos,
     RadarBotData,
@@ -12,8 +12,7 @@ use swarm_lib::{
 
 use crate::{
     actions::InProgressAction,
-    core::{CellKind, Inventory, Tick},
-    gridworld::GridWorld,
+    core::{Inventory, SGridWorld as GridWorld, Tick},
     server::{BotId, BotIdToEntity, ServerUpdates},
 };
 
@@ -100,8 +99,9 @@ fn create_radar_data(
 
             let radar_cell = CellStateRadar {
                 kind: match cell.kind {
-                    CellKind::Empty => CellKindRadar::Empty,
-                    CellKind::Blocked => CellKindRadar::Blocked,
+                    CellKind::Empty => CellKind::Empty,
+                    CellKind::Blocked => CellKind::Blocked,
+                    CellKind::Unknown => unreachable!(),
                 },
                 pawn: cell.pawn.map(|e| {
                     let (bot_id, _, &team, _, _, _) = query.get(e).unwrap();
