@@ -11,7 +11,6 @@ use crate::{
     ActionId,
     BotResponse,
     Dir,
-    SubscriptionType,
     Team,
 };
 
@@ -256,16 +255,12 @@ impl RadarData {
 #[derive(Debug, Clone, Default)]
 pub struct BotResponseBuilder {
     actions: Vec<ActionEnvelope>,
-    subscribe: Vec<SubscriptionType>,
-    unsubscribe: Vec<SubscriptionType>,
 }
 
 impl BotResponseBuilder {
     pub fn new() -> Self {
         Self {
             actions: Vec::new(),
-            subscribe: Vec::new(),
-            unsubscribe: Vec::new(),
         }
     }
 
@@ -282,21 +277,9 @@ impl BotResponseBuilder {
         self.push_action_id(action, rand::rng().random())
     }
 
-    pub fn subscribe(&mut self, subscription: SubscriptionType) -> &mut Self {
-        self.subscribe.push(subscription);
-        self
-    }
-
-    pub fn unsubscribe(&mut self, subscription: SubscriptionType) -> &mut Self {
-        self.unsubscribe.push(subscription);
-        self
-    }
-
     pub fn build(&mut self) -> BotResponse {
         BotResponse {
             actions: std::mem::take(&mut self.actions),
-            subscribe: std::mem::take(&mut self.subscribe),
-            unsubscribe: std::mem::take(&mut self.unsubscribe),
         }
     }
 }

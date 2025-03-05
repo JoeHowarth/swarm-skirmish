@@ -142,20 +142,9 @@ fn handle_connection(
                 ClientMsg::Connect => error!("Sent 'Connect' msg twice"),
                 ClientMsg::BotMsg(BotMsgEnvelope { bot_id, tick, msg }) => {
                     // Process bot response
+                    // Actions
                     for action in msg.actions {
                         action_tx.send((BotId(bot_id), tick, action)).unwrap();
-                    }
-
-                    // Handle subscriptions
-                    if !msg.subscribe.is_empty() {
-                        subscription_tx
-                            .send((BotId(bot_id), msg.subscribe))
-                            .unwrap();
-                    }
-
-                    // Handle unsubscriptions if needed
-                    if !msg.unsubscribe.is_empty() {
-                        // Add handling for unsubscriptions if needed
                     }
                 }
             }

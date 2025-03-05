@@ -15,7 +15,6 @@ use swarm_lib::{
     Dir,
     Item::{self, *},
     ServerUpdate,
-    SubscriptionType,
 };
 
 use crate::{BotUpdate, CtxExt};

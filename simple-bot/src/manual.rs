@@ -2,7 +2,12 @@ use std::io::stdin;
 
 use eyre::Result;
 use swarm_lib::{
-    bevy_math::UVec2, bot_harness::{Bot, Ctx}, Action, BotResponse, Dir, Pos, SubscriptionType
+    bevy_math::UVec2,
+    bot_harness::{Bot, Ctx},
+    Action,
+    BotResponse,
+    Dir,
+    Pos,
 };
 
 pub struct TerminalControlledBot {
@@ -16,10 +21,7 @@ impl Bot for TerminalControlledBot {
 
     fn run(&mut self) -> Result<()> {
         // Subscribe to position and radar initially
-        let initial_response = BotResponse::builder()
-            .subscribe(SubscriptionType::Position)
-            .subscribe(SubscriptionType::Radar)
-            .build();
+        let initial_response = BotResponse::builder().build();
         self.rpc.send_msg(initial_response);
         self.rpc.info("Terminal-controlled bot initialized");
 

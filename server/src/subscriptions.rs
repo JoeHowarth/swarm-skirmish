@@ -1,5 +1,5 @@
 use array2d::Array2D;
-use bevy::{prelude::*, utils::HashSet};
+use bevy::prelude::*;
 use swarm_lib::{
     CellKindRadar,
     CellStateRadar,
@@ -8,7 +8,6 @@ use swarm_lib::{
     RadarData,
     ServerUpdate,
     ServerUpdateEnvelope,
-    SubscriptionType,
     Team,
 };
 
@@ -20,7 +19,7 @@ use crate::{
 };
 
 #[derive(Component, Default)]
-pub struct Subscriptions(HashSet<SubscriptionType>);
+pub struct Subscriptions;
 
 pub struct SubscriptionsPlugin;
 
@@ -31,24 +30,11 @@ impl Plugin for SubscriptionsPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
-            (handle_bot_subscriptions, send_server_updates)
-                .chain()
-                .in_set(SubscriptionsSystemSet),
+            send_server_updates.in_set(SubscriptionsSystemSet),
         );
     }
 }
 
-fn handle_bot_subscriptions(
-    query_recv: ResMut<SubscriptionRecv>,
-    mut query: Query<&mut Subscriptions>,
-    bot_id_to_entity: Res<BotIdToEntity>,
-) {
-    while let Ok((bot_id, new_subscriptions)) = query_recv.0.try_recv() {
-        let entity = bot_id_to_entity.0.get(&bot_id).unwrap();
-        let mut set = query.get_mut(*entity).unwrap();
-        set.0.extend(new_subscriptions);
-    }
-}
 
 fn send_server_updates(
     update_tx: Res<ServerUpdates>,
@@ -56,25 +42,15 @@ fn send_server_updates(
     query: Query<(&BotId, &Pos, &Team, &Subscriptions, &InProgressAction, &Inventory)>,
     grid_world: Res<GridWorld>,
 ) {
-    for (bot_id, pos, team, subscriptions, in_progress_action, inventory) in query.iter() {
+    for (bot_id, pos, team, _subscriptions, in_progress_action, inventory) in query.iter() {
         let update = ServerUpdateEnvelope {
             bot_id: bot_id.0,
             seq: 0,
             response: ServerUpdate {
                 tick: tick.0,
-                team: subscriptions
-                    .0
-                    .get(&SubscriptionType::Team)
-                    .map(|_| *team),
-                position: subscriptions
-                    .0
-                    .get(&SubscriptionType::Position)
-                    .map(|_| pos)
-                    .copied(),
-                radar: subscriptions
-                    .0
-                    .get(&SubscriptionType::Radar)
-                    .map(|_| create_radar_data(pos, &grid_world, &query)),
+                team: *team,
+                position: *pos,
+                radar: create_radar_data(pos, &grid_world, &query),
                 action_result: in_progress_action.opt.clone(),
                 items: inventory.0.clone(),
             },

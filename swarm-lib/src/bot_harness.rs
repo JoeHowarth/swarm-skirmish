@@ -326,21 +326,14 @@ impl Ctx {
         self.logger.error(message);
     }
 
-    /// Prints the radar data to the terminal if available in the server update
+    /// Prints the radar data to the terminal
     pub fn print_radar(&mut self, update: &ServerUpdate) {
-        if let Some(radar) = &update.radar {
-            self.logger.info(format!(
-                "Radar for Bot {} (Tick {}):\n{}",
-                self.bot_id,
-                update.tick,
-                format_radar(radar)
-            ));
-        } else {
-            self.logger.warn(
-                "No radar data available. Make sure to subscribe to radar \
-                 updates.",
-            );
-        }
+        self.logger.info(format!(
+            "Radar for Bot {} (Tick {}):\n{}",
+            self.bot_id,
+            update.tick,
+            format_radar(&update.radar)
+        ));
     }
 }
 

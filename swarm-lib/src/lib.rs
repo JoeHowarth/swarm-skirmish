@@ -10,60 +10,33 @@ pub mod types;
 
 pub use types::*;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub enum SubscriptionType {
-    Position,
-    Radar,
-    Team,
-}
 
-// Server -> Bot: Full update on each tick for subscribed data
+// Server -> Bot: Full update on each tick with all data
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerUpdate {
     // Always present
     pub tick: u32,
 
-    // Subscribed state (only what the bot has requested)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(default)]
-    pub team: Option<Team>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(default)]
-    pub position: Option<Pos>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(default)]
-    pub radar: Option<RadarData>,
-
-    #[serde(skip_serializing_if = "HashMap::is_empty")]
-    #[serde(default)]
+    // Bot state - always included now
+    pub team: Team,
+    pub position: Pos,
+    pub radar: RadarData,
     pub items: HashMap<Item, u32>,
 
     // Results from previous actions
-    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     pub action_result: Option<ActionResult>,
     // Server messages (errors, notifications, etc.)
     // pub messages: Vec<ServerMessage>,
 }
 
-// Bot -> Server: Optional response with bundled fields
+// Bot -> Server: Optional response with actions
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BotResponse {
     // Actions to take (empty vec if none)
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[serde(default)]
     pub actions: Vec<ActionEnvelope>,
-
-    // Subscription changes (both additions and removals)
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    #[serde(default)]
-    pub subscribe: Vec<SubscriptionType>,
-
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    #[serde(default)]
-    pub unsubscribe: Vec<SubscriptionType>,
 }
 
 impl BotResponse {
@@ -71,8 +44,6 @@ impl BotResponse {
     pub fn new() -> Self {
         Self {
             actions: Vec::new(),
-            subscribe: Vec::new(),
-            unsubscribe: Vec::new(),
         }
     }
 
