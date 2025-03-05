@@ -17,6 +17,7 @@ use swarm_lib::{
     Dir,
     Item::{self, *},
     Pos,
+    RadarData,
     ServerUpdate,
     Team,
 };
@@ -30,11 +31,7 @@ use crate::{
     MAP_WIDTH,
 };
 
-/// Crumb follower seeks to move onto cells with Item::Fent
-/// If no Fent is seen nearby, it follows the path of cells with Item::Crumb
-/// until it finds Fent
 pub struct CrumbFollower {
-    // don't directly access this in BotUpdate
     ctx: Ctx,
     rng: SmallRng,
     default_dir: Dir,
@@ -43,11 +40,90 @@ pub struct CrumbFollower {
     seen_bots: Vec<ClientBotData>,
 }
 
+impl CrumbFollower {
+    // Helper method to determine the next action with a linear flow instead of
+    // nested conditionals
+    fn determine_next_action(
+        &mut self,
+        radar: &RadarData,
+        tick: u32,
+    ) -> Action {
+        // Priority 1: Find and move toward Fent
+        if let Some((dir, _)) = radar.find_dirs(CellStateRadar::has_item(Fent))
+        {
+            self.ctx.debug("Found Fent");
+            return Action::MoveDir(dir);
+        }
+
+        // Priority 2: Harvest nearby Truffle
+        if let Some((dir, _)) =
+            radar.find_dirs(CellStateRadar::has_item(Truffle))
+        {
+            self.ctx.debug(format!("Harvesting Truffle {dir:?}"));
+            return Action::Harvest(dir);
+        }
+
+        // Priority 3: Follow Crumb
+        if let Some((_, cell)) = radar.find(CellStateRadar::has_item(Crumb)) {
+            self.ctx
+                .debug(format!("Found Crumb at world position: {}", cell.pos));
+            return Action::MoveTo(cell.pos);
+        }
+
+        // Priority 4: Go to known Truffle location
+        if let Some((pos, cell)) = self
+            .grid
+            .iter()
+            .find(|(_, cell)| cell.item == Some(Truffle))
+        {
+            let pos = Pos::from((pos.0 + 1, pos.1));
+            self.ctx.debug(format!(
+                "Going to truffle at position: {}. Last observed {}, {} ticks \
+                 ago",
+                pos,
+                cell.last_observed,
+                tick - cell.last_observed
+            ));
+            return Action::MoveTo(Pos::from(pos));
+        }
+
+        // Priority 5: Explore unknown cells
+        if let Some((pos, _)) = self
+            .grid
+            .iter()
+            .find(|(_, cell)| cell.kind == CellKind::Unknown)
+        {
+            self.ctx.debug(format!(
+                "Found unexplored cell at position: {}",
+                Pos::from(pos)
+            ));
+            return Action::MoveTo(Pos::from(pos));
+        }
+
+        // Priority 6: Random movement if nothing else to do
+        if self.rng.random_bool(0.2)
+            || radar
+                .get_dir(self.default_dir)
+                .map(|cell| cell.kind)
+                .unwrap_or(CellKind::Blocked)
+                == CellKind::Blocked
+        {
+            self.ctx.debug("Changing default dir");
+            self.default_dir =
+                Dir::from_repr(self.rng.random_range(0..=3)).unwrap();
+        }
+
+        self.ctx
+            .debug("No unexplored cells found, moving to default dir");
+        Action::MoveDir(self.default_dir)
+    }
+}
+
 impl BotUpdate for CrumbFollower {
     fn update(&mut self, update: ServerUpdate) -> Option<BotResponse> {
         let radar = &update.radar;
-
-        if let Some(result) = update.action_result {
+        let action_result = update.action_result;
+        if let Some(result) = action_result {
             self.ctx.debug(format!("{result:?}"));
 
             if result.status == ActionStatus::InProgress {
@@ -57,81 +133,8 @@ impl BotUpdate for CrumbFollower {
             }
         }
 
-        let action = if let Some((dir, _)) =
-            radar.find_dirs(CellStateRadar::has_item(Fent))
-        {
-            self.ctx.debug("Found Fent");
-            Action::MoveDir(dir)
-        } else {
-            if let Some((dir, _)) =
-                radar.find_dirs(CellStateRadar::has_item(Truffle))
-            {
-                self.ctx.debug(format!("Harvesting Truffle {dir:?}"));
-                Action::Harvest(dir)
-            } else {
-                if let Some((_, cell)) =
-                    radar.find(CellStateRadar::has_item(Crumb))
-                {
-                    self.ctx.debug(format!(
-                        "Found Crumb at world position: {}",
-                        cell.pos
-                    ));
-
-                    Action::MoveTo(cell.pos)
-                } else {
-                    if let Some((pos, cell)) = self
-                        .grid
-                        .iter()
-                        .find(|(_, cell)| cell.item == Some(Truffle))
-                    {
-                        let pos = Pos::from((pos.0 + 1, pos.1));
-                        self.ctx.debug(format!(
-                            "Going to truffle at position: {}. Last observed \
-                             {}, {} ticks ago",
-                            pos,
-                            cell.last_observed,
-                            update.tick - cell.last_observed
-                        ));
-
-                        Action::MoveTo(Pos::from(pos))
-                    } else {
-                        // Look for unexplored cells in our known map
-                        if let Some((pos, _)) = self
-                            .grid
-                            .iter()
-                            .find(|(_, cell)| cell.kind == CellKind::Unknown)
-                        {
-                            self.ctx.debug(format!(
-                                "Found unexplored cell at position: {}",
-                                Pos::from(pos)
-                            ));
-                            Action::MoveTo(Pos::from(pos))
-                        } else {
-                            // If no unexplored cells, fall back to random
-                            // movement
-                            if self.rng.random_bool(0.2)
-                                || radar
-                                    .get_dir(self.default_dir)
-                                    .map(|cell| cell.kind)
-                                    .unwrap_or(CellKind::Blocked)
-                                    == CellKind::Blocked
-                            {
-                                self.ctx.debug("Changing default dir");
-                                self.default_dir = Dir::from_repr(
-                                    self.rng.random_range(0..=3),
-                                )
-                                .unwrap();
-                            }
-                            self.ctx.debug(
-                                "No unexplored cells found, moving to default \
-                                 dir",
-                            );
-                            Action::MoveDir(self.default_dir)
-                        }
-                    }
-                }
-            }
-        };
+        // Determine the next action using a linear decision flow
+        let action = self.determine_next_action(radar, update.tick);
 
         // Build and send response with movement action
         self.action_counter += 1;
