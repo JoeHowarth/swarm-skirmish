@@ -6,7 +6,6 @@ use swarm_lib::{
     BotResponse,
     Dir,
     ServerUpdate,
-    SubscriptionType,
 };
 
 use crate::{BotUpdate, CtxExt};

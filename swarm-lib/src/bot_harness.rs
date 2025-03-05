@@ -14,7 +14,16 @@ use chrono::Local;
 use eyre::Result;
 
 use crate::{
-    protocol::Protocol, BotMsgEnvelope, BotResponse, CellKindRadar, ClientMsg, RadarData, ServerMsg, ServerUpdate, ServerUpdateEnvelope, Team
+    protocol::Protocol,
+    BotMsgEnvelope,
+    BotResponse,
+    CellKindRadar,
+    ClientMsg,
+    RadarData,
+    ServerMsg,
+    ServerUpdate,
+    ServerUpdateEnvelope,
+    Team,
 };
 
 /// Log level for bot logs

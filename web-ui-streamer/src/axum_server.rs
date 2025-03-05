@@ -70,8 +70,8 @@ pub async fn run_axum_server(
             axum::http::header::AUTHORIZATION,
             axum::http::header::ACCEPT,
         ]);
-        // Allow credentials (cookies, etc.)
-        // .allow_credentials(true);
+    // Allow credentials (cookies, etc.)
+    // .allow_credentials(true);
 
     // build our application with some routes
     let app = Router::new()

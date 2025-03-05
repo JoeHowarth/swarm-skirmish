@@ -5,14 +5,7 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
-use crate::{
-    Action,
-    ActionEnvelope,
-    ActionId,
-    BotResponse,
-    Dir,
-    Team,
-};
+use crate::{Action, ActionEnvelope, ActionId, BotResponse, Dir, Team};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RadarBotData {
@@ -206,7 +199,7 @@ impl RadarData {
         }
 
         // Search spirally outward from center
-        let size = self.size() as isize ;
+        let size = self.size() as isize;
         let size = size + size;
         let max_distance = size.max(1); // Ensure we don't go into an infinite loop
 

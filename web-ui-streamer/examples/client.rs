@@ -12,8 +12,7 @@
 
 use std::{ops::ControlFlow, time::Instant};
 
-use futures::stream::FuturesUnordered;
-use futures::{SinkExt, StreamExt};
+use futures::{stream::FuturesUnordered, SinkExt, StreamExt};
 use tokio_tungstenite::tungstenite::Utf8Bytes;
 // we will use tungstenite for websocket client impl (same library as what
 // axum is using)

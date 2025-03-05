@@ -9,7 +9,15 @@ use bevy::{prelude::*, utils::HashMap};
 use eyre::{bail, Context, Result};
 use serde::Serialize;
 use swarm_lib::{
-    protocol::Protocol, Action, ActionEnvelope, BotMsgEnvelope, ClientMsg, JournalEntry, ServerMsg, ServerUpdateEnvelope, Team
+    protocol::Protocol,
+    Action,
+    ActionEnvelope,
+    BotMsgEnvelope,
+    ClientMsg,
+    JournalEntry,
+    ServerMsg,
+    ServerUpdateEnvelope,
+    Team,
 };
 
 use crate::{
@@ -31,11 +39,6 @@ pub struct ServerUpdates(pub mpmc::Sender<ServerUpdateEnvelope>);
 #[derive(Resource)]
 pub struct ActionRecv(pub mpmc::Receiver<(BotId, u32, ActionEnvelope)>);
 
-#[derive(Resource)]
-pub struct SubscriptionRecv(
-    pub mpmc::Receiver<(BotId, Vec<swarm_lib::SubscriptionType>)>,
-);
-
 #[derive(Resource, Default)]
 pub struct BotIdToEntity(pub HashMap<BotId, Entity>);
 
@@ -49,18 +52,16 @@ impl Plugin for BotHandlerPlugin {
         let (new_bots_tx, new_bots_rx) = mpmc::channel();
         let (server_update_tx, server_update_rx) = mpmc::channel();
         let (action_tx, action_rx) = mpmc::channel();
-        let (subscription_tx, subscription_rx) = mpmc::channel();
 
         app.init_resource::<BotIdToEntity>()
             .insert_resource(NewBots(new_bots_tx))
             .insert_resource(ServerUpdates(server_update_tx))
-            .insert_resource(ActionRecv(action_rx))
-            .insert_resource(SubscriptionRecv(subscription_rx));
+            .insert_resource(ActionRecv(action_rx));
 
         app.add_systems(Update, add_new_bots.in_set(ServerSystems));
 
         std::thread::spawn(move || {
-            server(new_bots_rx, server_update_rx, action_tx, subscription_tx)
+            server(new_bots_rx, server_update_rx, action_tx)
         });
     }
 }
@@ -90,7 +91,6 @@ fn server(
     new_bots_rx: mpmc::Receiver<(u32, PawnKind)>,
     server_update_rx: mpmc::Receiver<ServerUpdateEnvelope>,
     action_tx: mpmc::Sender<(BotId, u32, ActionEnvelope)>,
-    subscription_tx: mpmc::Sender<(BotId, Vec<swarm_lib::SubscriptionType>)>,
 ) {
     let listener = TcpListener::bind("127.0.0.1:1234").unwrap();
 
@@ -100,7 +100,6 @@ fn server(
         let new_bots_rx = new_bots_rx.clone();
         let server_update_rx = server_update_rx.clone();
         let action_tx = action_tx.clone();
-        let subscription_tx = subscription_tx.clone();
 
         std::thread::spawn(move || {
             if let Err(e) = handle_connection(
@@ -108,7 +107,6 @@ fn server(
                 new_bots_rx,
                 server_update_rx,
                 action_tx,
-                subscription_tx,
             ) {
                 eprintln!("Connection error: {:?}", e);
             }
@@ -121,7 +119,6 @@ fn handle_connection(
     new_bots_rx: mpmc::Receiver<(u32, PawnKind)>,
     server_update_rx: mpmc::Receiver<ServerUpdateEnvelope>,
     action_tx: mpmc::Sender<(BotId, u32, ActionEnvelope)>,
-    subscription_tx: mpmc::Sender<(BotId, Vec<swarm_lib::SubscriptionType>)>,
 ) -> Result<()> {
     let (mut reader, mut writer) =
         create_protocol_handlers(stream, "./journal.json").unwrap();
@@ -174,7 +171,6 @@ fn handle_connection(
         }
     }
 }
-
 
 pub fn create_protocol_handlers(
     stream: TcpStream,

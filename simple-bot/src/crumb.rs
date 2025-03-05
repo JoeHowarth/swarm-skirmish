@@ -32,7 +32,7 @@ pub struct CrumbFollower {
 
 impl BotUpdate for CrumbFollower {
     fn update(&mut self, update: ServerUpdate) -> Option<BotResponse> {
-        let radar = update.radar.expect("Subscribed to radar");
+        let radar = &update.radar;
 
         if let Some(result) = update.action_result {
             self.ctx.debug(format!("{result:?}"));

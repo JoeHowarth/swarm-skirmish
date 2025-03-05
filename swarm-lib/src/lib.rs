@@ -1,6 +1,6 @@
-use bevy_utils::HashMap;
 use bevy_ecs::component::Component;
 pub use bevy_math;
+use bevy_utils::HashMap;
 use serde::{Deserialize, Serialize};
 use strum_macros::Display;
 
@@ -9,7 +9,6 @@ pub mod protocol;
 pub mod types;
 
 pub use types::*;
-
 
 // Server -> Bot: Full update on each tick with all data
 #[derive(Debug, Clone, Serialize, Deserialize)]

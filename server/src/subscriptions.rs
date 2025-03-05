@@ -15,7 +15,7 @@ use crate::{
     actions::InProgressAction,
     core::{CellKind, Inventory, Tick},
     gridworld::GridWorld,
-    server::{BotId, BotIdToEntity, ServerUpdates, SubscriptionRecv},
+    server::{BotId, BotIdToEntity, ServerUpdates},
 };
 
 #[derive(Component, Default)]
@@ -35,14 +35,22 @@ impl Plugin for SubscriptionsPlugin {
     }
 }
 
-
 fn send_server_updates(
     update_tx: Res<ServerUpdates>,
     tick: Res<Tick>,
-    query: Query<(&BotId, &Pos, &Team, &Subscriptions, &InProgressAction, &Inventory)>,
+    query: Query<(
+        &BotId,
+        &Pos,
+        &Team,
+        &Subscriptions,
+        &InProgressAction,
+        &Inventory,
+    )>,
     grid_world: Res<GridWorld>,
 ) {
-    for (bot_id, pos, team, _subscriptions, in_progress_action, inventory) in query.iter() {
+    for (bot_id, pos, team, _subscriptions, in_progress_action, inventory) in
+        query.iter()
+    {
         let update = ServerUpdateEnvelope {
             bot_id: bot_id.0,
             seq: 0,
@@ -63,7 +71,14 @@ fn send_server_updates(
 fn create_radar_data(
     pos: &Pos,
     grid_world: &GridWorld,
-    query: &Query<(&BotId, &Pos, &Team, &Subscriptions, &InProgressAction, &Inventory)>,
+    query: &Query<(
+        &BotId,
+        &Pos,
+        &Team,
+        &Subscriptions,
+        &InProgressAction,
+        &Inventory,
+    )>,
 ) -> RadarData {
     // Create a radar with a 11x11 grid centered on the bot
     let radar_size = 11;

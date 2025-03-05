@@ -34,14 +34,11 @@ impl Bot for TerminalControlledBot {
             // Display radar data visually
             self.rpc.print_radar(&update);
 
-            if let Some(pos) = &update.position {
-                self.rpc.info(format!("Current position: {:?}", pos));
-            }
-
-            if let Some(radar) = &update.radar {
-                self.rpc
-                    .debug(format!("Radar shows {} bots", radar.bots.len()));
-            }
+            // Display position and radar data
+            self.rpc
+                .info(format!("Current position: {:?}", update.position));
+            self.rpc
+                .debug(format!("Radar shows {} bots", update.radar.bots.len()));
 
             // User interaction prompts still use println since they're for
             // direct user interaction
