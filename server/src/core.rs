@@ -45,6 +45,13 @@ pub struct CellState {
 }
 
 impl CellState {
+    pub fn empty() -> CellState {
+        CellState {
+            kind: CellKind::Empty,
+            ..default()
+        }
+    }
+
     pub fn blocked() -> CellState {
         CellState {
             kind: CellKind::Blocked,

@@ -38,7 +38,7 @@ impl Bot for TerminalControlledBot {
             self.rpc
                 .info(format!("Current position: {:?}", update.position));
             self.rpc
-                .debug(format!("Radar shows {} bots", update.radar.bots.len()));
+                .debug(format!("Radar shows {} bots", update.radar.pawns.len()));
 
             // User interaction prompts still use println since they're for
             // direct user interaction

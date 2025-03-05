@@ -27,6 +27,7 @@ pub enum CellKind {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CellStateRadar {
     pub kind: CellKind,
+    /// Index of pawn in pawns array
     pub pawn: Option<usize>,
     pub item: Option<Item>,
     pub pos: Pos, // Added world position to each cell
@@ -47,7 +48,7 @@ pub enum Item {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RadarData {
     pub center_world_pos: Pos,
-    pub bots: Vec<RadarBotData>,
+    pub pawns: Vec<RadarBotData>,
     /// Note: cells sorted by closeness to center, with ties broken by
     /// direction
     pub cells: Vec<CellStateRadar>,

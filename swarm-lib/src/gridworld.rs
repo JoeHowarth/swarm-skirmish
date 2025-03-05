@@ -9,9 +9,9 @@ pub struct GridWorld<CellState> {
 }
 
 impl<CellState: PassableCell> GridWorld<CellState> {
-    pub fn new(width: usize, height: usize) -> Self {
+    pub fn new(width: usize, height: usize, fill: CellState) -> Self {
         Self {
-            grid: Array2D::filled_with(CellState::default(), width, height),
+            grid: Array2D::filled_with(fill, width, height),
         }
     }
 
@@ -263,7 +263,7 @@ mod tests {
 
     fn create_test_grid() -> GridWorld<Cell> {
         // Create a 5x5 grid for testing
-        let mut grid = GridWorld::new(5, 5);
+        let mut grid = GridWorld::new(5, 5, Cell::default());
 
         // Fill with unique values to make testing easier
         for x in 0..5 {
@@ -323,7 +323,7 @@ mod tests {
 
     #[test]
     fn test_pathfinding_simple() {
-        let mut grid = GridWorld::new(5, 5);
+        let mut grid = GridWorld::new(5, 5, Default::default());
         let mut pathfinder = PathFinder::new(5, 5);
 
         // Test simple path without obstacles
@@ -342,7 +342,7 @@ mod tests {
 
     #[test]
     fn test_pathfinding_blocked() {
-        let mut grid = GridWorld::new(3, 3);
+        let mut grid = GridWorld::new(3, 3, Default::default());
         let mut pathfinder = PathFinder::new(3, 3);
 
         let blocked = Cell { is_blocked: true };

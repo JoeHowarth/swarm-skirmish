@@ -4,9 +4,11 @@ use rand::{
     Rng,
     SeedableRng,
 };
+use serde::{Deserialize, Serialize};
 use swarm_lib::{
     bevy_math::UVec2,
     bot_harness::{Bot, Ctx},
+    gridworld::{GridWorld, PassableCell},
     Action,
     ActionStatus,
     BotResponse,
@@ -14,10 +16,19 @@ use swarm_lib::{
     CellStateRadar,
     Dir,
     Item::{self, *},
+    Pos,
     ServerUpdate,
+    Team,
 };
 
-use crate::{BotUpdate, CtxExt};
+use crate::{
+    BotUpdate,
+    ClientBotData,
+    ClientCellState,
+    CtxExt,
+    MAP_HEIGHT,
+    MAP_WIDTH,
+};
 
 /// Crumb follower seeks to move onto cells with Item::Fent
 /// If no Fent is seen nearby, it follows the path of cells with Item::Crumb
@@ -28,6 +39,8 @@ pub struct CrumbFollower {
     rng: SmallRng,
     default_dir: Dir,
     action_counter: u32,
+    grid: GridWorld<ClientCellState>,
+    seen_bots: Vec<ClientBotData>,
 }
 
 impl BotUpdate for CrumbFollower {
@@ -90,6 +103,12 @@ impl BotUpdate for CrumbFollower {
     fn ctx(&mut self) -> &mut Ctx {
         &mut self.ctx
     }
+
+    fn known_map(
+        &mut self,
+    ) -> (&mut GridWorld<ClientCellState>, &mut Vec<ClientBotData>) {
+        (&mut self.grid, &mut self.seen_bots)
+    }
 }
 
 impl Bot for CrumbFollower {
@@ -99,6 +118,12 @@ impl Bot for CrumbFollower {
             ctx,
             default_dir: Dir::Up,
             action_counter: 0,
+            grid: GridWorld::new(
+                MAP_WIDTH,
+                MAP_HEIGHT,
+                ClientCellState::default(),
+            ),
+            seen_bots: Vec::new(),
         }
     }
 

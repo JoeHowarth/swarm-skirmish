@@ -87,7 +87,7 @@ fn create_radar_data(
 
     let mut radar = RadarData {
         center_world_pos: *pos,
-        bots: Vec::new(),
+        pawns: Vec::new(),
         cells: Vec::new(),
     };
 
@@ -107,13 +107,13 @@ fn create_radar_data(
                     let (bot_id, _, &team, _, _, _) = query.get(e).unwrap();
 
                     // Store the bot's position in world coordinates
-                    radar.bots.push(RadarBotData {
+                    radar.pawns.push(RadarBotData {
                         team,
                         pos: cell_pos,
                         bot_id: bot_id.0,
                     });
 
-                    radar.bots.len() - 1
+                    radar.pawns.len() - 1
                 }),
                 item: cell.item,
                 pos: cell_pos,

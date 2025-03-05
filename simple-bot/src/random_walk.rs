@@ -2,17 +2,29 @@ use eyre::Result;
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use swarm_lib::{
     bot_harness::{Bot, Ctx},
+    gridworld::GridWorld,
     Action,
     BotResponse,
+    CellStateRadar,
     Dir,
+    RadarBotData,
     ServerUpdate,
 };
 
-use crate::{BotUpdate, CtxExt};
+use crate::{
+    BotUpdate,
+    ClientBotData,
+    ClientCellState,
+    CtxExt,
+    MAP_HEIGHT,
+    MAP_WIDTH,
+};
 
 pub struct RandomWalkBot {
     ctx: Ctx,
     rng: SmallRng,
+    grid: GridWorld<ClientCellState>,
+    seen_bots: Vec<ClientBotData>,
 }
 
 impl Bot for RandomWalkBot {
@@ -20,6 +32,12 @@ impl Bot for RandomWalkBot {
         Self {
             rng: SmallRng::seed_from_u64(ctx.bot_id as u64),
             ctx: ctx,
+            grid: GridWorld::new(
+                MAP_WIDTH,
+                MAP_HEIGHT,
+                ClientCellState::default(),
+            ),
+            seen_bots: Vec::new(),
         }
     }
 
@@ -51,5 +69,11 @@ impl BotUpdate for RandomWalkBot {
 
     fn ctx(&mut self) -> &mut Ctx {
         &mut self.ctx
+    }
+
+    fn known_map(
+        &mut self,
+    ) -> (&mut GridWorld<ClientCellState>, &mut Vec<ClientBotData>) {
+        (&mut self.grid, &mut self.seen_bots)
     }
 }

@@ -511,7 +511,7 @@ pub fn format_radar(radar: &RadarData) -> String {
             CellKind::Unknown => ['.', ' '],
             CellKind::Empty => {
                 if let Some(pawn_idx) = cell.pawn {
-                    let bot = &radar.bots[pawn_idx];
+                    let bot = &radar.pawns[pawn_idx];
                     match bot.team {
                         Team::Player => ['P', ' '],
                         Team::Enemy => ['E', ' '],
@@ -579,9 +579,9 @@ pub fn format_radar(radar: &RadarData) -> String {
     ));
 
     // Bot information
-    if !radar.bots.is_empty() {
+    if !radar.pawns.is_empty() {
         output.push_str("\nBots detected:\n");
-        for (i, bot) in radar.bots.iter().enumerate() {
+        for (i, bot) in radar.pawns.iter().enumerate() {
             output
                 .push_str(&format!("  {}: {:?} at {}\n", i, bot.team, bot.pos));
         }

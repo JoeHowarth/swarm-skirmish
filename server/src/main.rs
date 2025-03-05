@@ -58,7 +58,7 @@ fn main() {
 }
 
 fn init_map(mut commands: Commands) {
-    let mut grid_world = GridWorld::new(16, 16);
+    let mut grid_world = GridWorld::new(16, 16, CellState::empty());
 
     let player = commands
         .spawn((PawnKind::default(), Team::Player, Pos((2, 2).into())))
