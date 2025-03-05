@@ -28,7 +28,9 @@ pub enum CellKind {
 pub struct CellStateRadar {
     pub kind: CellKind,
     /// Index of pawn in pawns array
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub pawn: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub item: Option<Item>,
     pub pos: Pos, // Added world position to each cell
 }
@@ -43,6 +45,7 @@ impl CellStateRadar {
 pub enum Item {
     Crumb,
     Fent,
+    Truffle,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
