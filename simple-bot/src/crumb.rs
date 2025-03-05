@@ -50,22 +50,23 @@ impl BotUpdate for CrumbFollower {
             self.ctx.debug("Found Fent");
             Action::MoveDir(dir)
         } else {
-            if let Some(((rel_x, rel_y), _)) =
+            if let Some(((rel_x, rel_y), cell)) =
                 radar.find(CellStateRadar::has_item(Crumb))
             {
-                self.ctx.debug("Found Crumb");
+                self.ctx.debug(format!("Found Crumb at world position: {}", cell.pos));
 
-                Action::MoveTo(radar.rel_to_world(rel_x, rel_y))
+                Action::MoveTo(cell.pos)
             } else {
                 // Generally moves in a consistent direction, but small chance
                 // to change directions or change if going to hit wall
                 if self.rng.random_bool(0.2)
-                    || radar.get_dir(self.default_dir).kind
-                        == CellKindRadar::Blocked
+                    || radar.get_dir(self.default_dir)
+                        .map(|cell| cell.kind)
+                        .unwrap_or(CellKindRadar::Blocked) == CellKindRadar::Blocked
                 {
                     self.ctx.debug("Changing default dir");
                     self.default_dir =
-                        Dir::from_repr(self.rng.random_range(0..=4)).unwrap();
+                        Dir::from_repr(self.rng.random_range(0..=3)).unwrap();
                 }
                 self.ctx
                     .debug("No adjacent Fent or Crumb, moving to default dir");

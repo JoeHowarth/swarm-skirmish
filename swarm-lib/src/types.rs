@@ -1,4 +1,3 @@
-use array2d::Array2D;
 use bevy_ecs::component::Component;
 use bevy_math::{IVec2, UVec2};
 use rand::Rng;
@@ -25,11 +24,12 @@ pub enum CellKindRadar {
     Blocked,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CellStateRadar {
     pub kind: CellKindRadar,
     pub pawn: Option<usize>,
     pub item: Option<Item>,
+    pub pos: Pos, // Added world position to each cell
 }
 
 impl CellStateRadar {
@@ -48,56 +48,10 @@ pub enum Item {
 pub struct RadarData {
     pub center_world_pos: Pos,
     pub bots: Vec<RadarBotData>,
-    pub cells: Array2D<CellStateRadar>,
+    pub cells: Vec<CellStateRadar>, // Changed from Array2D to Vec
 }
 
 impl RadarData {
-    /// Get radar size (assumes square radar)
-    pub fn size(&self) -> usize {
-        self.cells.column_len() // or row_len(), they should be equal
-    }
-
-    /// Get the center index of the radar (where the bot is located)
-    pub fn center_index(&self) -> usize {
-        self.size() / 2
-    }
-
-    /// Convert relative coordinates to array indices
-    /// (0,0) relative is the center of the radar (where the bot is)
-    /// Returns None if the resulting indices would be out of bounds
-    pub fn rel_to_index(
-        &self,
-        rel_x: isize,
-        rel_y: isize,
-    ) -> Option<(usize, usize)> {
-        let center = self.center_index() as isize;
-        let x = center + rel_x;
-        let y = center + rel_y;
-
-        if x >= 0
-            && x < self.size() as isize
-            && y >= 0
-            && y < self.size() as isize
-        {
-            Some((x as usize, y as usize))
-        } else {
-            None
-        }
-    }
-
-    /// Convert array indices to relative coordinates
-    pub fn index_to_rel(
-        &self,
-        index_x: usize,
-        index_y: usize,
-    ) -> (isize, isize) {
-        let center = self.center_index();
-        (
-            index_x as isize - center as isize,
-            index_y as isize - center as isize,
-        )
-    }
-
     /// Convert relative coordinates to world coordinates
     pub fn rel_to_world(&self, rel_x: isize, rel_y: isize) -> Pos {
         let (world_x, world_y) = self.center_world_pos.as_isize();
@@ -108,55 +62,49 @@ impl RadarData {
     pub fn world_to_rel(&self, world: Pos) -> (isize, isize) {
         let (center_x, center_y) = self.center_world_pos.as_isize();
         let (world_x, world_y) = world.as_isize();
-        (world_x as isize - center_x, world_y as isize - center_y)
+        (world_x - center_x, world_y - center_y)
     }
 
     /// Get a cell by relative coordinates
-    /// Returns None if out of bounds
-    pub fn get_relative(
-        &self,
-        rel_x: isize,
-        rel_y: isize,
-    ) -> Option<&CellStateRadar> {
-        self.rel_to_index(rel_x, rel_y)
-            .and_then(|(x, y)| self.cells.get(x, y))
+    /// Returns None if no cell exists at those coordinates
+    pub fn get_relative(&self, rel_x: isize, rel_y: isize) -> Option<&CellStateRadar> {
+        let target_pos = self.rel_to_world(rel_x, rel_y);
+        self.cells.iter().find(|cell| cell.pos == target_pos)
     }
 
-    pub fn get_dir(&self, dir: Dir) -> &CellStateRadar {
+    /// Get a cell in the specified direction
+    pub fn get_dir(&self, dir: Dir) -> Option<&CellStateRadar> {
         let (rel_x, rel_y) = dir.to_deltas();
-        self.get_relative(rel_x, rel_y).unwrap()
+        self.get_relative(rel_x, rel_y)
     }
 
+    /// Find directions that match a predicate
     pub fn find_dirs(
         &self,
         mut filter: impl FnMut(&CellStateRadar) -> bool,
     ) -> Option<(Dir, &CellStateRadar)> {
         Dir::iter().find_map(|dir| {
-            let cell = self.get_dir(dir);
-            if filter(cell) {
-                Some((dir, cell))
-            } else {
-                None
+            if let Some(cell) = self.get_dir(dir) {
+                if filter(cell) {
+                    return Some((dir, cell));
+                }
             }
+            None
         })
     }
 
     /// Get a mutable reference to a cell by relative coordinates
-    /// Returns None if out of bounds
+    /// Returns None if no cell exists at those coordinates
     pub fn get_relative_mut(
         &mut self,
         rel_x: isize,
         rel_y: isize,
     ) -> Option<&mut CellStateRadar> {
-        if let Some((x, y)) = self.rel_to_index(rel_x, rel_y) {
-            self.cells.get_mut(x, y)
-        } else {
-            None
-        }
+        let target_pos = self.rel_to_world(rel_x, rel_y);
+        self.cells.iter_mut().find(|cell| cell.pos == target_pos)
     }
 
-    /// Filter cells based on a predicate, returning iterator of (rel_coords,
-    /// cell_ref) pairs
+    /// Filter cells based on a predicate, returning iterator of (rel_coords, cell_ref) pairs
     pub fn filter<F>(
         &self,
         filter: F,
@@ -164,20 +112,13 @@ impl RadarData {
     where
         F: Fn(&CellStateRadar) -> bool + Copy + 'static,
     {
-        let size = self.size();
-        let center = self.center_index();
-
-        (0..size).flat_map(move |y| {
-            (0..size).filter_map(move |x| {
-                let cell = self.cells.get(x, y)?;
-                if filter(cell) {
-                    let rel_x = x as isize - center as isize;
-                    let rel_y = y as isize - center as isize;
-                    Some(((rel_x, rel_y), cell))
-                } else {
-                    None
-                }
-            })
+        self.cells.iter().filter_map(move |cell| {
+            if filter(cell) {
+                let rel_coords = self.world_to_rel(cell.pos);
+                Some((rel_coords, cell))
+            } else {
+                None
+            }
         })
     }
 
@@ -191,56 +132,22 @@ impl RadarData {
         F: Fn(&CellStateRadar) -> bool + Copy + 'static,
     {
         // First check if center cell matches
-        let center = self.center_index();
-        if let Some(cell) = self.cells.get(center, center) {
-            if filter(cell) {
-                return Some(((0, 0), cell));
+        if let Some(center_cell) = self.get_relative(0, 0) {
+            if filter(center_cell) {
+                return Some(((0, 0), center_cell));
             }
         }
 
-        // Search spirally outward from center
-        let size = self.size() as isize;
-        let size = size + size;
-        let max_distance = size.max(1); // Ensure we don't go into an infinite loop
-
-        for distance in 1..max_distance {
-            // Check all cells at Manhattan distance 'distance' from center
-            for dx in -distance..=distance {
-                for dy in [-distance, distance] {
-                    // Top and bottom edges
-                    if dx.abs() + dy.abs() != distance {
-                        continue;
-                    }
-
-                    if let Some((x, y)) = self.rel_to_index(dx, dy) {
-                        if let Some(cell) = self.cells.get(x, y) {
-                            if filter(cell) {
-                                return Some(((dx, dy), cell));
-                            }
-                        }
-                    }
-                }
-            }
-
-            for dy in (-distance + 1)..distance {
-                for dx in [-distance, distance] {
-                    // Left and right edges
-                    if dx.abs() + dy.abs() != distance {
-                        continue;
-                    }
-
-                    if let Some((x, y)) = self.rel_to_index(dx, dy) {
-                        if let Some(cell) = self.cells.get(x, y) {
-                            if filter(cell) {
-                                return Some(((dx, dy), cell));
-                            }
-                        }
-                    }
-                }
-            }
+        // Find all matching cells
+        let matching_cells: Vec<_> = self.filter(filter).collect();
+        if matching_cells.is_empty() {
+            return None;
         }
 
-        None
+        // Sort by Manhattan distance and return the closest
+        matching_cells.into_iter().min_by_key(|((rel_x, rel_y), _)| {
+            rel_x.abs() + rel_y.abs() // Manhattan distance
+        })
     }
 }
 
@@ -292,7 +199,7 @@ impl Dir {
     }
 
     pub fn from_deltas(deltas: (isize, isize)) -> Option<Self> {
-        match (deltas.0, deltas.1) {
+        match deltas {
             (0, 1) => Some(Dir::Up),
             (0, -1) => Some(Dir::Down),
             (-1, 0) => Some(Dir::Left),

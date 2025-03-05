@@ -14,6 +14,6 @@ eyre = { workspace = true }
 chrono = { workspace = true }
 bevy_ecs = { version = "0.15", features = ["serialize"] }
 bevy_math = { version = "0.15", features = ["serialize"] }
-array2d = { version = "0.3", features = ["serde"] }
+# Removed array2d dependency as we now use Vec<CellStateRadar> instead
 rand = { version = "0.9", features = ["small_rng"] }
 bevy_utils = "0.15"

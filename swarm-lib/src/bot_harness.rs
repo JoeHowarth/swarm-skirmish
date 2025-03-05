@@ -468,55 +468,122 @@ impl Harness {
 
 /// Formats radar data as a string instead of printing directly
 pub fn format_radar(radar: &RadarData) -> String {
-    let width = radar.cells.num_columns();
-    let height = radar.cells.num_rows();
     let mut output = String::new();
-
+    
+    // Determine the bounds of the radar view for display purposes
+    let (min_x, max_x, min_y, max_y) = if !radar.cells.is_empty() {
+        let (min_x, min_y) = radar.cells.iter().fold(
+            (isize::MAX, isize::MAX),
+            |(min_x, min_y), cell| {
+                let (world_x, world_y) = cell.pos.as_isize();
+                (min_x.min(world_x), min_y.min(world_y))
+            },
+        );
+        
+        let (max_x, max_y) = radar.cells.iter().fold(
+            (isize::MIN, isize::MIN),
+            |(max_x, max_y), cell| {
+                let (world_x, world_y) = cell.pos.as_isize();
+                (max_x.max(world_x), max_y.max(world_y))
+            },
+        );
+        
+        (min_x, max_x, min_y, max_y)
+    } else {
+        // If no cells, just show a small area around the center
+        let (center_x, center_y) = radar.center_world_pos.as_isize();
+        (center_x - 2, center_x + 2, center_y - 2, center_y + 2)
+    };
+    
+    let width = (max_x - min_x + 1) as usize;
+    let height = (max_y - min_y + 1) as usize;
+    
+    // Create a 2D grid for display purposes
+    let mut display_grid = vec![vec![['.', ' ']; width]; height];
+    
+    // Fill the grid with cell representations
+    for cell in &radar.cells {
+        let (world_x, world_y) = cell.pos.as_isize();
+        let grid_x = (world_x - min_x) as usize;
+        let grid_y = (max_y - world_y) as usize; // Flip Y for display
+        
+        let cell_repr: [char; 2] = match cell.kind {
+            CellKindRadar::Unknown => ['.', ' '],
+            CellKindRadar::Empty => {
+                if let Some(pawn_idx) = cell.pawn {
+                    let bot = &radar.bots[pawn_idx];
+                    match bot.team {
+                        Team::Player => ['P', ' '],
+                        Team::Enemy => ['E', ' '],
+                    }
+                } else if let Some(item) = cell.item {
+                    match item {
+                        crate::Item::Crumb => ['C', ' '], // Crumb
+                        crate::Item::Fent => ['F', ' '], // Fent
+                    }
+                } else {
+                    [' ', ' '] // Empty space
+                }
+            }
+            CellKindRadar::Blocked => ['[', ']'],
+        };
+        
+        // Write the two characters to the grid
+        if grid_y < height && grid_x < width {
+            if let Some(row) = display_grid.get_mut(grid_y) {
+                let idx = grid_x;
+                if idx < row.len() {
+                    row[idx] = cell_repr;
+                }
+            }
+        }
+    }
+    
+    // Mark the bot's position with a special character
+    let (center_x, center_y) = radar.center_world_pos.as_isize();
+    let grid_center_x = (center_x - min_x) as usize;
+    let grid_center_y = (max_y - center_y) as usize;
+    
+    if grid_center_y < height && grid_center_x < width {
+        if let Some(row) = display_grid.get_mut(grid_center_y) {
+            let idx = grid_center_x;
+            if idx < row.len() {
+                // Always mark the center position with '@'
+                row[idx] = ['@', ' '];
+            }
+        }
+    }
+    
+    // Now render the grid
     // Top border
     output.push_str(&format!("┌{}┐\n", "─".repeat(width * 2)));
-
+    
     // Radar grid
     for y in 0..height {
         output.push('│');
         for x in 0..width {
-            // Get cell at (x,y)
-            let cell = radar.cells.get(x, height - y - 1).unwrap();
-            match cell.kind {
-                CellKindRadar::Unknown => output.push_str(". "),
-                CellKindRadar::Empty => {
-                    if let Some(pawn_idx) = cell.pawn {
-                        let bot = &radar.bots[pawn_idx as usize];
-                        match bot.team {
-                            Team::Player => output.push_str("P "),
-                            Team::Enemy => output.push_str("E "),
-                        }
-                    } else if let Some(item) = cell.item {
-                        match item {
-                            crate::Item::Crumb => output.push_str("C "), /* Crumb */
-                            crate::Item::Fent => output.push_str("F "), // Fent
-                        }
-                    } else {
-                        output.push_str("  ") // Empty space
-                    }
-                }
-                CellKindRadar::Blocked => output.push_str("[]"),
-            }
+            let cell_chars = display_grid[y][x];
+            output.push(cell_chars[0]);
+            output.push(cell_chars[1]);
         }
         output.push_str("│\n");
     }
-
+    
     // Bottom border
     output.push_str(&format!("└{}┘\n", "─".repeat(width * 2)));
-
+    
+    // Add world coordinate labels
+    output.push_str(&format!("World coordinates: ({}, {}) to ({}, {})\n",
+                             min_x, min_y, max_x, max_y));
+    
     // Bot information
     if !radar.bots.is_empty() {
         output.push_str("\nBots detected:\n");
         for (i, bot) in radar.bots.iter().enumerate() {
-            output
-                .push_str(&format!("  {}: {:?} at {}\n", i, bot.team, bot.pos));
+            output.push_str(&format!("  {}: {:?} at {}\n", i, bot.team, bot.pos));
         }
     }
-
+    
     output
 }
 

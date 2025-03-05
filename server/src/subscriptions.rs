@@ -1,4 +1,3 @@
-use array2d::Array2D;
 use bevy::prelude::*;
 use swarm_lib::{
     CellKindRadar,
@@ -80,41 +79,24 @@ fn create_radar_data(
         &Inventory,
     )>,
 ) -> RadarData {
-    // Create a radar with a 11x11 grid centered on the bot
-    let radar_size = 11;
-    let radar_center = radar_size / 2; // Center point (5 for a 11x11 grid)
+    // Define the radar range (how far to look in each direction)
+    let radar_range = 5; // This gives a view of 11x11 cells centered on the bot (5 in each
+                         // direction)
 
     // Get bot's world coordinates
     let (bot_world_x, bot_world_y) = pos.as_isize();
 
     let mut radar = RadarData {
-        bots: Vec::new(),
-        cells: Array2D::filled_with(
-            CellStateRadar::default(),
-            radar_size,
-            radar_size,
-        ),
         center_world_pos: *pos,
+        bots: Vec::new(),
+        cells: Vec::new(),
     };
 
     // Use nearby to get cells in radar range with Manhattan distance
     grid_world
-        .nearby(bot_world_x as usize, bot_world_y as usize, radar_center)
-        .for_each(|((world_x, world_y), cell)| {
-            // Calculate radar coordinates (relative to bot at center)
-            let world_x = world_x as isize;
-            let world_y = world_y as isize;
-
-            let dx = world_x - bot_world_x;
-            let dy = world_y - bot_world_y;
-
-            let radar_x = (radar_center as isize + dx) as usize;
-            let radar_y = (radar_center as isize + dy) as usize;
-
-            // Skip if outside radar bounds
-            if radar_x >= radar_size || radar_y >= radar_size {
-                return;
-            }
+        .nearby(bot_world_x as usize, bot_world_y as usize, radar_range)
+        .for_each(|(pos, cell)| {
+            let cell_pos = Pos::from(pos);
 
             let radar_cell = CellStateRadar {
                 kind: match cell.kind {
@@ -124,61 +106,21 @@ fn create_radar_data(
                 pawn: cell.pawn.map(|e| {
                     let (bot_id, _, &team, _, _, _) = query.get(e).unwrap();
 
-                    // Store the bot's position in radar coordinates
+                    // Store the bot's position in world coordinates
                     radar.bots.push(RadarBotData {
                         team,
-                        pos: Pos::from((radar_x, radar_y)),
+                        pos: cell_pos,
                         bot_id: bot_id.0,
                     });
 
                     radar.bots.len() - 1
                 }),
                 item: cell.item,
+                pos: cell_pos,
             };
 
-            radar.cells.set(radar_x, radar_y, radar_cell).unwrap();
+            radar.cells.push(radar_cell);
         });
-
-    // Set all cells that would be outside the map bounds to Blocked instead of
-    // Unknown
-    let map_width = grid_world.width() as isize;
-    let map_height = grid_world.height() as isize;
-
-    // Iterate through all radar cells
-    for radar_x in 0..radar_size {
-        for radar_y in 0..radar_size {
-            // Calculate the corresponding world coordinates
-            let world_x =
-                bot_world_x + (radar_x as isize - radar_center as isize);
-            let world_y =
-                bot_world_y + (radar_y as isize - radar_center as isize);
-
-            // Check if the world coordinates are outside the map bounds
-            if world_x < 0
-                || world_x >= map_width
-                || world_y < 0
-                || world_y >= map_height
-            {
-                // If the cell is still Unknown (i.e., it wasn't filled by a
-                // valid map cell), mark it as Blocked
-                if let CellKindRadar::Unknown =
-                    radar.cells.get(radar_x, radar_y).unwrap().kind
-                {
-                    radar
-                        .cells
-                        .set(
-                            radar_x,
-                            radar_y,
-                            CellStateRadar {
-                                kind: CellKindRadar::Blocked,
-                                ..default()
-                            },
-                        )
-                        .unwrap();
-                }
-            }
-        }
-    }
 
     radar
 }
