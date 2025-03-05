@@ -5,13 +5,18 @@ use std::{
     net::TcpStream,
     path::PathBuf,
     process::exit,
-    sync::mpsc::{self, Receiver, Sender},
+    sync::{
+        mpsc::{self, Receiver, Sender},
+        Mutex,
+    },
     thread::sleep,
     time::Duration,
 };
 
+use bevy_utils::tracing::trace;
 use chrono::Local;
 use eyre::Result;
+use once_cell::sync::Lazy;
 
 use crate::{
     protocol::Protocol,
@@ -25,6 +30,17 @@ use crate::{
     ServerUpdateEnvelope,
     Team,
 };
+
+/// Global map size, initialized when ConnectAck is received
+static MAP_SIZE: Lazy<Mutex<Option<(usize, usize)>>> =
+    Lazy::new(|| Mutex::new(None));
+
+pub fn map_size() -> (usize, usize) {
+    MAP_SIZE
+        .lock()
+        .expect("cannot acquire MAP_SIZE lock")
+        .expect("Tried to get MAP_SIZE before ConnectAck")
+}
 
 /// Log level for bot logs
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -262,10 +278,15 @@ impl Ctx {
             .recv()
             .expect("Failed to receive server update");
 
+        let mut skipped = 0;
+
         // drain the channel
         while let Ok(new_update) = self.resp_rx.try_recv() {
+            skipped += 1;
             update = new_update;
         }
+
+        self.debug(format!("Skipped {skipped}"));
 
         // Update the logger's tick
         self.logger.set_tick(update.response.tick);
@@ -397,7 +418,15 @@ impl Harness {
                 let msg: ServerMsg =
                     Protocol::read_message(&mut reader).unwrap();
                 match msg {
-                    ServerMsg::ConnectAck => println!("ConnectAck"),
+                    ServerMsg::ConnectAck { map_size } => {
+                        println!("ConnectAck with map_size: {:?}", map_size);
+                        // Set the global MAP_SIZE
+                        if let Ok(mut global_map_size) = MAP_SIZE.lock() {
+                            *global_map_size = Some(map_size);
+                        } else {
+                            eprintln!("Failed to set global MAP_SIZE");
+                        }
+                    }
                     ServerMsg::AssignBot(bot_id, bot_type) => {
                         println!(
                             "Got AssignBot msg: {bot_id} (type: {bot_type}), \
@@ -417,6 +446,7 @@ impl Harness {
 
                         // Spawn bot
                         std::thread::spawn(move || {
+                            std::thread::sleep(Duration::from_millis(20));
                             if let Err(e) = bot.run() {
                                 eprintln!(
                                     "[Error] Bot {} error: {:?}",
@@ -518,8 +548,8 @@ pub fn format_radar(radar: &RadarData) -> String {
                     }
                 } else if let Some(item) = cell.item {
                     match item {
-                        crate::Item::Crumb => ['C', ' '], // Crumb
-                        crate::Item::Fent => ['F', ' '],  // Fent
+                        crate::Item::Crumb => ['C', ' '],   // Crumb
+                        crate::Item::Fent => ['F', ' '],    // Fent
                         crate::Item::Truffle => ['T', ' '], // Truffle
                     }
                 } else {

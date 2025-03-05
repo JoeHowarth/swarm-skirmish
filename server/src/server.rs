@@ -23,7 +23,7 @@ use swarm_lib::{
 use crate::{
     actions::{ActionQueue, ComputedActionQueue, InProgressAction},
     core::PawnKind,
-    subscriptions::Subscriptions,
+    subscriptions::Subscriptions, MAP_SIZE,
 };
 
 #[derive(Component, Debug, Clone, Copy, Hash, PartialEq, Eq)]
@@ -129,7 +129,7 @@ fn handle_connection(
     }
 
     // Send ConnectAck
-    writer.write_message(&ServerMsg::ConnectAck)?;
+    writer.write_message(&ServerMsg::ConnectAck { map_size: MAP_SIZE })?;
 
     std::thread::spawn(move || {
         let mut reader = reader;

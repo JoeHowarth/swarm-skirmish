@@ -7,10 +7,11 @@ use rand::{
 use serde::{Deserialize, Serialize};
 use swarm_lib::{
     bevy_math::UVec2,
-    bot_harness::{Bot, Ctx},
+    bot_harness::{map_size, Bot, Ctx},
     gridworld::{GridWorld, PassableCell},
     Action,
     ActionStatus,
+    ActionStatusDiscriminants,
     BotResponse,
     CellKind,
     CellStateRadar,
@@ -22,14 +23,7 @@ use swarm_lib::{
     Team,
 };
 
-use crate::{
-    BotUpdate,
-    ClientBotData,
-    ClientCellState,
-    CtxExt,
-    MAP_HEIGHT,
-    MAP_WIDTH,
-};
+use crate::{BotUpdate, ClientBotData, ClientCellState, CtxExt};
 
 pub struct CrumbFollower {
     ctx: Ctx,
@@ -87,14 +81,19 @@ impl CrumbFollower {
             return Action::MoveTo(Pos::from(pos));
         }
 
-        // Priority 5: Explore unknown cells
-        if let Some((pos, _)) = self
+        // Priority 5: Explore random unknown cells
+        let unknown_cells: Vec<_> = self
             .grid
             .iter()
-            .find(|(_, cell)| cell.kind == CellKind::Unknown)
-        {
+            .filter(|(_, cell)| cell.kind == CellKind::Unknown)
+            .collect();
+            
+        if !unknown_cells.is_empty() {
+            let random_index = self.rng.random_range(0..unknown_cells.len());
+            let (pos, _) = unknown_cells[random_index];
+            
             self.ctx.debug(format!(
-                "Found unexplored cell at position: {}",
+                "Found random unexplored cell at position: {}",
                 Pos::from(pos)
             ));
             return Action::MoveTo(Pos::from(pos));
@@ -126,7 +125,8 @@ impl BotUpdate for CrumbFollower {
         if let Some(result) = action_result {
             self.ctx.debug(format!("{result:?}"));
 
-            if result.status == ActionStatus::InProgress {
+            if ActionStatusDiscriminants::InProgress == (&result.status).into()
+            {
                 self.ctx
                     .info("Previous action still in progress, waiting...");
                 return None;
@@ -158,16 +158,13 @@ impl BotUpdate for CrumbFollower {
 
 impl Bot for CrumbFollower {
     fn new(ctx: Ctx) -> Self {
+        let (map_w, map_h) = map_size();
         Self {
+            grid: GridWorld::new(map_w, map_h, ClientCellState::default()),
             rng: SmallRng::seed_from_u64(ctx.bot_id as u64),
             ctx,
             default_dir: Dir::Up,
             action_counter: 0,
-            grid: GridWorld::new(
-                MAP_WIDTH,
-                MAP_HEIGHT,
-                ClientCellState::default(),
-            ),
             seen_bots: Vec::new(),
         }
     }

@@ -1,13 +1,6 @@
 use bevy::prelude::*;
 use swarm_lib::{
-    CellKind,
-    CellStateRadar,
-    Pos,
-    RadarBotData,
-    RadarData,
-    ServerUpdate,
-    ServerUpdateEnvelope,
-    Team,
+    CellKind, CellStateRadar, Energy, Pos, RadarBotData, RadarData, ServerUpdate, ServerUpdateEnvelope, Team
 };
 
 use crate::{
@@ -36,17 +29,10 @@ impl Plugin for SubscriptionsPlugin {
 fn send_server_updates(
     update_tx: Res<ServerUpdates>,
     tick: Res<Tick>,
-    query: Query<(
-        &BotId,
-        &Pos,
-        &Team,
-        &Subscriptions,
-        &InProgressAction,
-        &Inventory,
-    )>,
+    query: Query<(&BotId, &Pos, &Team, &InProgressAction, &Inventory, &Energy)>,
     grid_world: Res<GridWorld>,
 ) {
-    for (bot_id, pos, team, _subscriptions, in_progress_action, inventory) in
+    for (bot_id, pos, team, in_progress_action, inventory, energy) in
         query.iter()
     {
         let update = ServerUpdateEnvelope {
@@ -59,6 +45,7 @@ fn send_server_updates(
                 radar: create_radar_data(pos, &grid_world, &query),
                 action_result: in_progress_action.opt.clone(),
                 items: inventory.0.clone(),
+                energy: *energy,
             },
         };
 
@@ -73,9 +60,9 @@ fn create_radar_data(
         &BotId,
         &Pos,
         &Team,
-        &Subscriptions,
         &InProgressAction,
         &Inventory,
+        &Energy,
     )>,
 ) -> RadarData {
     // Define the radar range (how far to look in each direction)

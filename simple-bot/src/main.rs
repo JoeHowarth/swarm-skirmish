@@ -39,7 +39,7 @@ pub fn run_loop(updater: &mut impl BotUpdate) -> Result<()> {
         let update = updater.ctx().wait_for_latest_update();
 
         let (known_map, known_bots) = updater.known_map();
-        
+
         update_known_map(known_map, known_bots, &update.radar, update.tick);
 
         // Log debug info every tick
@@ -64,15 +64,28 @@ impl CtxExt for Ctx {
         self.debug(format!("Processing tick {}", update.tick));
 
         if update.tick % log_every_x_ticks == 0 {
-            self.debug(format!("Current position: {:?}", update.position));
+            // Format items as a readable list
+            let items_str = if update.items.is_empty() {
+                "None".to_string()
+            } else {
+                update
+                    .items
+                    .iter()
+                    .map(|(item, count)| format!("{}: {}", item, count))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            };
 
-            // Use structured logging for bot detection
-            let mut attrs = std::collections::HashMap::new();
-            attrs.insert(
-                "num_bots".to_string(),
-                update.radar.pawns.len().to_string(),
-            );
-            self.log_with_attrs("Radar scan complete", attrs);
+            self.debug(format!(
+                "Bot Status Report [Tick {}]:\n{}\nEnergy: {}\nDetected Bots: \
+                 {}\nItems: {}\nTeam: {:?}",
+                update.tick,
+                update.position,
+                update.energy.0,
+                update.radar.pawns.len(),
+                items_str,
+                update.team
+            ));
 
             // The print_radar method now logs internally
             self.print_radar(&update);
@@ -144,9 +157,6 @@ pub fn update_known_map(
         }
     }
 }
-
-pub const MAP_WIDTH: usize = 16;
-pub const MAP_HEIGHT: usize = 16;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClientBotData {

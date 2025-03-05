@@ -4,6 +4,7 @@ use bevy_utils::HashMap;
 use serde::{Deserialize, Serialize};
 use strum_macros::Display;
 
+pub mod boring_impls;
 pub mod bot_harness;
 pub mod gridworld;
 pub mod protocol;
@@ -22,6 +23,7 @@ pub struct ServerUpdate {
     pub position: Pos,
     pub radar: RadarData,
     pub items: HashMap<Item, u32>,
+    pub energy: Energy,
 
     // Results from previous actions
     #[serde(default)]
@@ -53,8 +55,6 @@ impl BotResponse {
     }
 }
 
-///////////////
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ClientMsg {
     Connect,
@@ -66,6 +66,21 @@ pub struct BotMsgEnvelope {
     pub bot_id: u32,
     pub tick: u32,
     pub msg: BotResponse,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ServerMsg {
+    ConnectAck { map_size: (usize, usize) },
+    AssignBot(u32, String),
+    ServerUpdate(ServerUpdateEnvelope),
+    Close,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServerUpdateEnvelope {
+    pub bot_id: u32,
+    pub seq: u32,
+    pub response: ServerUpdate,
 }
 
 #[derive(
@@ -108,26 +123,19 @@ pub struct ActionResult {
     pub status: ActionStatus,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    strum_macros::EnumDiscriminants,
+)]
 pub enum ActionStatus {
     Success,
-    Failure,
-    InProgress,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ServerMsg {
-    ConnectAck,
-    AssignBot(u32, String),
-    ServerUpdate(ServerUpdateEnvelope),
-    Close,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ServerUpdateEnvelope {
-    pub bot_id: u32,
-    pub seq: u32,
-    pub response: ServerUpdate,
+    Failure(String),
+    InProgress { progress: u16, total: u16 },
 }
 
 #[derive(

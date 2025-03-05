@@ -1,12 +1,22 @@
-use bevy::{asset::RenderAssetUsages, prelude::*};
+use bevy::{
+    asset::RenderAssetUsages,
+    color::palettes::css,
+    gizmos,
+    prelude::*,
+};
 use bevy_ecs_tilemap::prelude::*;
 use image::DynamicImage;
-use swarm_lib::{CellKind, Team};
+use swarm_lib::{CellKind, Pos, Team};
 
 use crate::{
+    actions::{
+        ComputedActionKind::{Harvest, MoveDir},
+        ComputedActionQueue,
+    },
     core::{Inventory, SGridWorld as GridWorld, Tick},
     CellState,
     Item,
+    MAP_SIZE,
 };
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
@@ -18,10 +28,85 @@ impl Plugin for TilemapPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(bevy_ecs_tilemap::TilemapPlugin);
         app.add_systems(Startup, (load_tileset, setup_map).chain());
-        app.add_systems(Update, render_grid.in_set(TilemapSystemSet));
+        // Initialize the TilemapWorldCoords resource with default values
+        app.insert_resource(TilemapWorldCoords {
+            transform: Transform::default(),
+            grid_size: TilemapGridSize { x: 18.0, y: 18.0 },
+            map_type: TilemapType::Square,
+        });
+        // Add system to update the resource
+        app.add_systems(Update, update_tilemap_world_coords);
+        app.add_systems(Update, render_move_to);
+        app.add_systems(Update, (render_grid).in_set(TilemapSystemSet));
     }
 }
 
+fn render_move_to(
+    mut gizmos: Gizmos,
+    actions: Query<(&Pos, &ComputedActionQueue)>,
+    tilemap_coords: Res<TilemapWorldCoords>,
+) {
+    for (pos, computed_action) in actions.iter() {
+        let mut pos = *pos;
+        for action in &computed_action.0 {
+            match action.kind {
+                MoveDir(dir) => {
+                    let Some(dst) = pos + dir else {
+                        continue;
+                    };
+
+                    let src_world = tilemap_coords.pos_to_world(&pos);
+                    let dst_world = tilemap_coords.pos_to_world(&dst);
+
+                    gizmos.line_2d(src_world, dst_world, css::RED);
+
+                    pos = dst;
+                }
+                Harvest(_) => continue,
+            }
+        }
+    }
+}
+
+/// Resource that stores the components needed for world coordinate conversion
+#[derive(Resource)]
+pub struct TilemapWorldCoords {
+    pub transform: Transform,
+    pub grid_size: TilemapGridSize,
+    pub map_type: TilemapType,
+}
+
+impl TilemapWorldCoords {
+    /// Converts a game position (Pos) to world coordinates (Vec2)
+    pub fn pos_to_world(&self, pos: &Pos) -> Vec2 {
+        let tile_pos = TilePos {
+            x: pos.x() as u32,
+            y: pos.y() as u32,
+        };
+
+        // Get the position in tilemap's local space
+        let local_pos =
+            tile_pos.center_in_world(&self.grid_size, &self.map_type);
+
+        // Add the tilemap's translation to get world coordinates
+        local_pos + self.transform.translation.xy()
+    }
+}
+
+/// System to update the TilemapWorldCoords resource with the latest component
+/// values
+fn update_tilemap_world_coords(
+    tilemap: Query<(&Transform, &TilemapGridSize, &TilemapType)>,
+    mut coords: ResMut<TilemapWorldCoords>,
+) {
+    if let Ok((transform, grid_size, map_type)) = tilemap.get_single() {
+        coords.transform = *transform;
+        coords.grid_size = *grid_size;
+        coords.map_type = *map_type;
+    }
+}
+
+#[derive(Debug)]
 pub enum CellRender {
     Empty,
     Blocked,
@@ -75,6 +160,7 @@ fn render_grid(
         };
         let tile_entity = tile_storage.get(&pos).unwrap();
         let render = CellRender::from_state(state, &teams);
+        // trace!(?pos, ?render, "Render");
 
         *tiles.get_mut(tile_entity).unwrap() = render.cell_to_tile();
     }
@@ -119,7 +205,10 @@ fn process_magenta_to_black(image: DynamicImage) -> DynamicImage {
 struct AsciiTexture(Handle<Image>);
 
 fn setup_map(mut commands: Commands, ascii_texture: Res<AsciiTexture>) {
-    let map_size = TilemapSize { x: 16, y: 16 };
+    let map_size = TilemapSize {
+        x: MAP_SIZE.0 as u32,
+        y: MAP_SIZE.1 as u32,
+    };
     let tile_size = TilemapTileSize { x: 18.0, y: 18.0 };
     let grid_size = TilemapGridSize { x: 18.0, y: 18.0 };
 
@@ -136,9 +225,7 @@ fn setup_map(mut commands: Commands, ascii_texture: Res<AsciiTexture>) {
             let tile_entity = commands
                 .spawn(TileBundle {
                     position: tile_pos,
-                    texture_index: TileTextureIndex(
-                        (x + y * map_size.x) as u32 % 256,
-                    ), // This will create a pattern of ASCII chars
+                    texture_index: CellRender::Blocked.cell_to_tile(),
                     tilemap_id: TilemapId(tilemap_entity),
                     ..default()
                 })
@@ -158,7 +245,7 @@ fn setup_map(mut commands: Commands, ascii_texture: Res<AsciiTexture>) {
         texture: TilemapTexture::Single(ascii_texture.0.clone()),
         tile_size,
         transform: get_tilemap_center_transform(
-            &map_size, &grid_size, &map_type, 0.0,
+            &map_size, &grid_size, &map_type, -1.0,
         ),
         ..Default::default()
     });

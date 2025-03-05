@@ -15,7 +15,7 @@ use actions::{ActionsPlugin, ActionsSystemSet};
 use bevy::{prelude::*, time::common_conditions::on_timer};
 use server::{BotHandlerPlugin, BotId, ServerSystems};
 use subscriptions::{SubscriptionsPlugin, SubscriptionsSystemSet};
-use swarm_lib::{Item, Pos, Team};
+use swarm_lib::{Energy, Item, Pos, Team};
 use tilemap::TilemapSystemSet;
 
 mod actions;
@@ -23,6 +23,8 @@ mod core;
 mod server;
 mod subscriptions;
 mod tilemap;
+
+pub const MAP_SIZE: (usize, usize) = (50, 50);
 
 fn main() {
     App::new()
@@ -58,10 +60,16 @@ fn main() {
 }
 
 fn init_map(mut commands: Commands) {
-    let mut grid_world = GridWorld::new(16, 16, CellState::empty());
+    let mut grid_world =
+        GridWorld::new(MAP_SIZE.0, MAP_SIZE.1, CellState::empty());
 
     let player = commands
-        .spawn((PawnKind::default(), Team::Player, Pos((2, 2).into())))
+        .spawn((
+            PawnKind::default(),
+            Team::Player,
+            Energy(100),
+            Pos((2, 2).into()),
+        ))
         .id();
 
     // let enemy = commands
@@ -86,6 +94,19 @@ fn init_map(mut commands: Commands) {
     grid_world.get_mut(2, 8).item = Some(Item::Truffle);
     grid_world.get_mut(12, 2).item = Some(Item::Truffle);
 
+    // Add a border of Blocked cells around the edge of the grid
+    for x in 0..MAP_SIZE.0 {
+        // Top and bottom borders
+        grid_world.set(x, 0, CellState::blocked());
+        grid_world.set(x, MAP_SIZE.1 - 1, CellState::blocked());
+    }
+
+    for y in 0..MAP_SIZE.1 {
+        // Left and right borders
+        grid_world.set(0, y, CellState::blocked());
+        grid_world.set(MAP_SIZE.0 - 1, y, CellState::blocked());
+    }
+
     commands.insert_resource(grid_world);
 }
 
@@ -95,8 +116,11 @@ pub fn camera_setup(mut commands: Commands) {
         bevy_pancam::PanCam {
             move_keys: bevy_pancam::DirectionKeys::arrows(),
             grab_buttons: vec![MouseButton::Right],
+            min_scale: 0.25,
+            max_scale: 5.0,
             ..default()
         },
+        Transform::from_scale(Vec3::splat(2.0)), // Start zoomed out
     ));
 }
 

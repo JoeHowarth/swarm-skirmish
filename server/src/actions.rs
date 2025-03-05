@@ -7,7 +7,9 @@ use swarm_lib::{
     ActionId,
     ActionResult,
     ActionStatus,
+    ActionStatusDiscriminants,
     Dir,
+    Energy,
     Team,
 };
 
@@ -42,6 +44,16 @@ pub struct ComputedAction {
 pub enum ComputedActionKind {
     MoveDir(Dir),
     Harvest(Dir),
+}
+
+impl ComputedAction {
+    pub fn energy(&self) -> Energy {
+        match self.kind {
+            ComputedActionKind::MoveDir(d) => Action::MoveDir(d).energy(),
+            ComputedActionKind::Harvest(d) => Action::Harvest(d).energy(),
+        }
+        .unwrap()
+    }
 }
 
 pub struct ActionsPlugin;
@@ -99,7 +111,8 @@ fn handle_bot_actions(
     {
         dbg!(&in_progress);
         if let Some(result) = std::mem::take(&mut in_progress.opt) {
-            if result.status == ActionStatus::InProgress {
+            if ActionStatusDiscriminants::InProgress == (&result.status).into()
+            {
                 trace!(
                     ?bot_id,
                     "InProgressAction found, skipping until complete"
@@ -178,7 +191,10 @@ fn handle_bot_actions(
         in_progress.opt = Some(ActionResult {
             action,
             id,
-            status: ActionStatus::InProgress,
+            status: ActionStatus::InProgress {
+                progress: 0,
+                total: computed.len() as u16,
+            },
         });
     }
 }
@@ -191,6 +207,7 @@ fn process_computed_action(
         &mut InProgressAction,
         &mut ComputedActionQueue,
         &mut Inventory,
+        &mut Energy,
     )>,
     mut grid_world: ResMut<SGridWorld>,
 ) {
@@ -201,6 +218,7 @@ fn process_computed_action(
         mut in_progress,
         mut computed_queue,
         mut inventory,
+        mut energy,
     ) in query.iter_mut()
     {
         let Some(in_progress) = in_progress.opt.as_mut() else {
@@ -217,22 +235,45 @@ fn process_computed_action(
             "computed.parent_id != in_progress.id"
         );
 
-        let did_succeed = match computed.kind {
+        if let Some(new_energy) = *energy - computed.energy() {
+            *energy = new_energy;
+        } else {
+            in_progress.status = ActionStatus::Failure(format!(
+                "Insufficient energy for action {computed:?}. Has {}, Cost {}",
+                *energy,
+                computed.energy(),
+            ));
+            computed_queue.clear();
+            continue;
+        }
+
+        if let Err(reason) = match computed.kind {
             ComputedActionKind::MoveDir(dir) => {
                 handle_movement(entity, dir, &mut pos, &mut grid_world)
             }
             ComputedActionKind::Harvest(dir) => {
                 handle_harvest(dir, &pos, &mut grid_world, &mut inventory)
             }
-        };
-
-        if !did_succeed {
-            in_progress.status = ActionStatus::Failure;
+        } {
+            in_progress.status = ActionStatus::Failure(reason);
+            computed_queue.clear();
             continue;
         }
-        if computed_queue.is_empty() {
+
+        if (computed_queue.is_empty()) {
             in_progress.status = ActionStatus::Success;
             continue;
+        }
+
+        if let ActionStatus::InProgress { progress, .. } =
+            &mut in_progress.status
+        {
+            *progress += 1;
+        } else {
+            in_progress.status = ActionStatus::InProgress {
+                progress: 1,
+                total: computed_queue.len() as u16,
+            };
         }
     }
 }
@@ -242,19 +283,19 @@ fn handle_movement(
     dir: Dir,
     pos: &mut Pos,
     grid_world: &mut ResMut<SGridWorld>,
-) -> bool {
+) -> Result<(), String> {
     // Compute new position and bounds check
     let new_pos = *pos + dir.to_deltas();
     if !grid_world.in_bounds_i(new_pos) {
         warn!(?new_pos, pos = %*pos, "Movement out of bounds");
-        return false;
+        return Err("Movement out of Bounds".into());
     }
 
     // Ensure we pawn can enter new position
     let new_pos = Pos::from(new_pos);
     if !grid_world.get_pos(new_pos).can_enter() {
         warn!(?new_pos, pos = %*pos, "Cannot enter cell");
-        return false;
+        return Err("Cannot enter cell".into());
     }
 
     // Update cells
@@ -264,7 +305,7 @@ fn handle_movement(
     // Set position to new position
     *pos = new_pos;
 
-    true
+    Ok(())
 }
 
 fn handle_harvest(
@@ -272,14 +313,14 @@ fn handle_harvest(
     pos: &Pos,
     grid_world: &mut ResMut<SGridWorld>,
     inventory: &mut Inventory,
-) -> bool {
+) -> Result<(), String> {
     use swarm_lib::Item;
 
     // Calculate the target position to harvest from
     let target_pos = *pos + dir.to_deltas();
     if !grid_world.in_bounds_i(target_pos) {
         warn!(?target_pos, pos = %*pos, "Harvest target out of bounds");
-        return false;
+        return Err("Harvest target out of bounds".into());
     }
 
     let target_pos = Pos::from(target_pos);
@@ -288,7 +329,7 @@ fn handle_harvest(
     // Check if the target cell has a truffle
     if cell.item != Some(Item::Truffle) {
         warn!(?target_pos, pos = %*pos, "No truffle to harvest at target position");
-        return false;
+        return Err("No truffle to harvest at target position".into());
     }
 
     // Perform the harvest by marking the cell as no longer having a truffle
@@ -297,5 +338,5 @@ fn handle_harvest(
     info!(pos = %*pos, target = %target_pos, "Harvested truffle");
     *inventory.0.entry(Item::Truffle).or_default() += 1;
 
-    true
+    Ok(())
 }

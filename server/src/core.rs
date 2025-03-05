@@ -3,10 +3,7 @@ use std::fmt::Write;
 use bevy::{prelude::*, utils::HashMap};
 use strum_macros::Display;
 use swarm_lib::{
-    gridworld::{GridWorld, PassableCell},
-    CellKind,
-    Item,
-    Pos,
+    gridworld::{GridWorld, PassableCell}, CellKind, Energy, Item, Pos
 };
 
 use crate::server::BotId;
@@ -30,7 +27,7 @@ impl Plugin for CorePlugin {
 pub struct Tick(pub u32);
 
 #[derive(Component, Default, Display, Copy, Clone)]
-#[require(Inventory)]
+#[require(Inventory, Energy)]
 pub enum PawnKind {
     #[default]
     Basic,
