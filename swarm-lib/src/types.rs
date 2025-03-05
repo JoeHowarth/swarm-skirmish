@@ -59,9 +59,18 @@ pub struct RadarData {
 
 impl RadarData {
     /// Convert relative coordinates to world coordinates
-    pub fn rel_to_world(&self, rel_x: isize, rel_y: isize) -> Pos {
+    pub fn rel_to_world(&self, rel_x: isize, rel_y: isize) -> Option<Pos> {
         let (world_x, world_y) = self.center_world_pos.as_isize();
-        Pos::from((world_x + rel_x, world_y + rel_y))
+        let new_x = world_x + rel_x;
+        let new_y = world_y + rel_y;
+        
+        // Ensure coordinates are non-negative before creating Pos
+        if new_x < 0 || new_y < 0 {
+            // If coordinates would be negative, return None
+            None
+        } else {
+            Some(Pos::from((new_x, new_y)))
+        }
     }
 
     /// Convert world coordinates to relative coordinates
@@ -78,7 +87,7 @@ impl RadarData {
         rel_x: isize,
         rel_y: isize,
     ) -> Option<&CellStateRadar> {
-        let target_pos = self.rel_to_world(rel_x, rel_y);
+        let target_pos = self.rel_to_world(rel_x, rel_y)?;
         self.cells.iter().find(|cell| cell.pos == target_pos)
     }
 
@@ -110,7 +119,7 @@ impl RadarData {
         rel_x: isize,
         rel_y: isize,
     ) -> Option<&mut CellStateRadar> {
-        let target_pos = self.rel_to_world(rel_x, rel_y);
+        let target_pos = self.rel_to_world(rel_x, rel_y)?;
         self.cells.iter_mut().find(|cell| cell.pos == target_pos)
     }
 

@@ -63,31 +63,73 @@ impl BotUpdate for CrumbFollower {
             self.ctx.debug("Found Fent");
             Action::MoveDir(dir)
         } else {
-            if let Some((_, cell)) = radar.find(CellStateRadar::has_item(Crumb))
+            if let Some((dir, _)) =
+                radar.find_dirs(CellStateRadar::has_item(Truffle))
             {
-                self.ctx.debug(format!(
-                    "Found Crumb at world position: {}",
-                    cell.pos
-                ));
-
-                Action::MoveTo(cell.pos)
+                self.ctx.debug(format!("Harvesting Truffle {dir:?}"));
+                Action::Harvest(dir)
             } else {
-                // Generally moves in a consistent direction, but small chance
-                // to change directions or change if going to hit wall
-                if self.rng.random_bool(0.2)
-                    || radar
-                        .get_dir(self.default_dir)
-                        .map(|cell| cell.kind)
-                        .unwrap_or(CellKind::Blocked)
-                        == CellKind::Blocked
+                if let Some((_, cell)) =
+                    radar.find(CellStateRadar::has_item(Crumb))
                 {
-                    self.ctx.debug("Changing default dir");
-                    self.default_dir =
-                        Dir::from_repr(self.rng.random_range(0..=3)).unwrap();
+                    self.ctx.debug(format!(
+                        "Found Crumb at world position: {}",
+                        cell.pos
+                    ));
+
+                    Action::MoveTo(cell.pos)
+                } else {
+                    if let Some((pos, cell)) = self
+                        .grid
+                        .iter()
+                        .find(|(_, cell)| cell.item == Some(Truffle))
+                    {
+                        let pos = Pos::from((pos.0 + 1, pos.1));
+                        self.ctx.debug(format!(
+                            "Going to truffle at position: {}. Last observed \
+                             {}, {} ticks ago",
+                            pos,
+                            cell.last_observed,
+                            update.tick - cell.last_observed
+                        ));
+
+                        Action::MoveTo(Pos::from(pos))
+                    } else {
+                        // Look for unexplored cells in our known map
+                        if let Some((pos, _)) = self
+                            .grid
+                            .iter()
+                            .find(|(_, cell)| cell.kind == CellKind::Unknown)
+                        {
+                            self.ctx.debug(format!(
+                                "Found unexplored cell at position: {}",
+                                Pos::from(pos)
+                            ));
+                            Action::MoveTo(Pos::from(pos))
+                        } else {
+                            // If no unexplored cells, fall back to random
+                            // movement
+                            if self.rng.random_bool(0.2)
+                                || radar
+                                    .get_dir(self.default_dir)
+                                    .map(|cell| cell.kind)
+                                    .unwrap_or(CellKind::Blocked)
+                                    == CellKind::Blocked
+                            {
+                                self.ctx.debug("Changing default dir");
+                                self.default_dir = Dir::from_repr(
+                                    self.rng.random_range(0..=3),
+                                )
+                                .unwrap();
+                            }
+                            self.ctx.debug(
+                                "No unexplored cells found, moving to default \
+                                 dir",
+                            );
+                            Action::MoveDir(self.default_dir)
+                        }
+                    }
                 }
-                self.ctx
-                    .debug("No adjacent Fent or Crumb, moving to default dir");
-                Action::MoveDir(self.default_dir)
             }
         };
 

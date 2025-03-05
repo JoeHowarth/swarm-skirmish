@@ -38,6 +38,7 @@ impl CellRender {
             CellRender::Pawn(false) => 2,
             CellRender::Item(Item::Crumb) => 250,
             CellRender::Item(Item::Fent) => 239,
+            CellRender::Item(Item::Truffle) => 84, // 'T' in ASCII
         })
     }
 

@@ -12,7 +12,7 @@ use swarm_lib::{
 };
 
 use crate::{
-    core::{SGridWorld, Tick},
+    core::{Inventory, SGridWorld, Tick},
     server::{ActionRecv, BotId, BotIdToEntity},
     Pos,
 };
@@ -41,6 +41,7 @@ pub struct ComputedAction {
 #[derive(Debug, Clone)]
 pub enum ComputedActionKind {
     MoveDir(Dir),
+    Harvest(Dir),
 }
 
 pub struct ActionsPlugin;
@@ -125,6 +126,14 @@ fn handle_bot_actions(
                     kind: ComputedActionKind::MoveDir(dir),
                 })
             }
+            Action::Harvest(dir) => {
+                debug!(?bot_id, ?dir, "Harvesting in direction");
+
+                computed.push_back(ComputedAction {
+                    parent_id: id,
+                    kind: ComputedActionKind::Harvest(dir),
+                })
+            }
             Action::MoveTo(goal) => {
                 if goal == *pos {
                     debug!(?bot_id, ?goal, "Already at goal position");
@@ -181,11 +190,18 @@ fn process_computed_action(
         &mut Pos,
         &mut InProgressAction,
         &mut ComputedActionQueue,
+        &mut Inventory,
     )>,
     mut grid_world: ResMut<SGridWorld>,
 ) {
-    for (entity, _id, mut pos, mut in_progress, mut computed_queue) in
-        query.iter_mut()
+    for (
+        entity,
+        _id,
+        mut pos,
+        mut in_progress,
+        mut computed_queue,
+        mut inventory,
+    ) in query.iter_mut()
     {
         let Some(in_progress) = in_progress.opt.as_mut() else {
             assert!(
@@ -204,6 +220,9 @@ fn process_computed_action(
         let did_succeed = match computed.kind {
             ComputedActionKind::MoveDir(dir) => {
                 handle_movement(entity, dir, &mut pos, &mut grid_world)
+            }
+            ComputedActionKind::Harvest(dir) => {
+                handle_harvest(dir, &pos, &mut grid_world, &mut inventory)
             }
         };
 
@@ -244,6 +263,39 @@ fn handle_movement(
 
     // Set position to new position
     *pos = new_pos;
+
+    true
+}
+
+fn handle_harvest(
+    dir: Dir,
+    pos: &Pos,
+    grid_world: &mut ResMut<SGridWorld>,
+    inventory: &mut Inventory,
+) -> bool {
+    use swarm_lib::Item;
+
+    // Calculate the target position to harvest from
+    let target_pos = *pos + dir.to_deltas();
+    if !grid_world.in_bounds_i(target_pos) {
+        warn!(?target_pos, pos = %*pos, "Harvest target out of bounds");
+        return false;
+    }
+
+    let target_pos = Pos::from(target_pos);
+    let cell = grid_world.get_pos(target_pos);
+
+    // Check if the target cell has a truffle
+    if cell.item != Some(Item::Truffle) {
+        warn!(?target_pos, pos = %*pos, "No truffle to harvest at target position");
+        return false;
+    }
+
+    // Perform the harvest by marking the cell as no longer having a truffle
+    // The actual item pickup happens in the harvest_truffles system in core.rs
+    grid_world.get_pos_mut(target_pos).item = None;
+    info!(pos = %*pos, target = %target_pos, "Harvested truffle");
+    *inventory.0.entry(Item::Truffle).or_default() += 1;
 
     true
 }

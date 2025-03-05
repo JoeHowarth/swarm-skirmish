@@ -98,6 +98,7 @@ pub struct ActionEnvelope {
 pub enum Action {
     MoveDir(Dir),
     MoveTo(Pos),
+    Harvest(Dir),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

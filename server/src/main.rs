@@ -51,7 +51,7 @@ fn main() {
                 SubscriptionsSystemSet,
             )
                 .chain()
-                .run_if(on_timer(Duration::from_millis(1000))),
+                .run_if(on_timer(Duration::from_millis(500))),
         )
         .add_systems(Update, (exit_system, check_win_condition, display_win_ui))
         .run();
@@ -82,6 +82,9 @@ fn init_map(mut commands: Commands) {
     }
     // Add fent at end of crumb trail
     grid_world.get_mut(8, 14).item = Some(Item::Fent);
+
+    grid_world.get_mut(2, 8).item = Some(Item::Truffle);
+    grid_world.get_mut(12, 2).item = Some(Item::Truffle);
 
     commands.insert_resource(grid_world);
 }
@@ -121,12 +124,21 @@ fn check_win_condition(
         return;
     }
     for (bot, inventory, team) in query.iter() {
-        if let Some(&amt) = inventory.get(&Item::Fent) {
-            if amt > 0 {
-                info!("Team {team} won! Bot {bot:?} picked up the Fent");
-                commands.insert_resource(Won(*team));
-            }
+        let Some(&amt) = inventory.get(&Item::Fent) else {
+            continue;
+        };
+        if amt == 0 {
+            continue;
         }
+
+        let Some(&amt) = inventory.get(&Item::Truffle) else {
+            continue;
+        };
+        if amt < 2 {
+            continue;
+        }
+        info!("Team {team} won! Bot {bot:?} picked up the Fent and 2 Truffles");
+        commands.insert_resource(Won(*team));
     }
 }
 
