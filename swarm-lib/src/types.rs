@@ -48,7 +48,9 @@ pub enum Item {
 pub struct RadarData {
     pub center_world_pos: Pos,
     pub bots: Vec<RadarBotData>,
-    pub cells: Vec<CellStateRadar>, // Changed from Array2D to Vec
+    /// Note: cells sorted by closeness to center, with ties broken by
+    /// direction
+    pub cells: Vec<CellStateRadar>,
 }
 
 impl RadarData {
@@ -144,17 +146,17 @@ impl RadarData {
         }
 
         // Find all matching cells
-        let matching_cells: Vec<_> = self.filter(filter).collect();
-        if matching_cells.is_empty() {
-            return None;
-        }
+        self.filter(filter).next()
+        // if matching_cells.is_empty() {
+        //     return None;
+        // }
 
-        // Sort by Manhattan distance and return the closest
-        matching_cells
-            .into_iter()
-            .min_by_key(|((rel_x, rel_y), _)| {
-                rel_x.abs() + rel_y.abs() // Manhattan distance
-            })
+        // // Sort by Manhattan distance and return the closest
+        // matching_cells
+        //     .into_iter()
+        //     .min_by_key(|((rel_x, rel_y), _)| {
+        //         rel_x.abs() + rel_y.abs() // Manhattan distance
+        //     })
     }
 }
 

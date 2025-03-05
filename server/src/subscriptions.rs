@@ -122,5 +122,34 @@ fn create_radar_data(
             radar.cells.push(radar_cell);
         });
 
+    // Sort radar cells by manhattan distance from center, with direction as
+    // tiebreaker for deterministic ordering
+    radar.cells.sort_by_key(|cell| {
+        let dx = (cell.pos.x() as isize - bot_world_x).abs() as u32;
+        let dy = (cell.pos.y() as isize - bot_world_y).abs() as u32;
+        let manhattan_distance = (dx + dy) * 100; // Scale by 100 to make room for direction tiebreaker
+
+        // Calculate direction as u8 for tiebreaking
+        let dir_value = if dx == 0 && dy == 0 {
+            0 // Center cell
+        } else if dx >= dy {
+            // Primarily east/west
+            if cell.pos.x() as isize >= bot_world_x {
+                1
+            } else {
+                2
+            } // East = 1, West = 2
+        } else {
+            // Primarily north/south
+            if cell.pos.y() as isize >= bot_world_y {
+                3
+            } else {
+                4
+            } // North = 3, South = 4
+        };
+
+        manhattan_distance + dir_value
+    });
+
     radar
 }

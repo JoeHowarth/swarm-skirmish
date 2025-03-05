@@ -5,9 +5,9 @@ use serde::{Deserialize, Serialize};
 use strum_macros::Display;
 
 pub mod bot_harness;
+pub mod gridworld;
 pub mod protocol;
 pub mod types;
-pub mod gridworld;
 
 pub use types::*;
 
@@ -76,7 +76,9 @@ pub struct BotMsgEnvelope {
     Deserialize,
     strum_macros::EnumIter,
     strum_macros::FromRepr,
+    strum_macros::EnumDiscriminants,
 )]
+#[repr(u8)]
 pub enum Dir {
     Up,
     Down,

@@ -3,7 +3,10 @@ use std::fmt::Write;
 use bevy::{prelude::*, utils::HashMap};
 use strum_macros::Display;
 use swarm_lib::{
-    gridworld::{GridWorld, PassableCell}, CellKind, Item, Pos
+    gridworld::{GridWorld, PassableCell},
+    CellKind,
+    Item,
+    Pos,
 };
 
 use crate::server::BotId;
