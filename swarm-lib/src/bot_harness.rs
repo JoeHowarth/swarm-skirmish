@@ -47,14 +47,18 @@ pub fn map_size() -> (usize, usize) {
 
 /// Log level for bot logs
 
-pub trait Bot: Send + 'static {
+pub trait Bot: Sync + Send + 'static + std::fmt::Debug {
+    fn update(&mut self, update: ServerUpdate) -> Option<BotResponse>;
+}
+
+pub trait OldBot: Send + 'static {
     fn new(ctx: Ctx) -> Self
     where
         Self: Sized;
     fn run(&mut self) -> Result<()>;
 }
 
-type BotFactory = Box<dyn Fn(Ctx) -> Box<dyn Bot> + Send>;
+type BotFactory = Box<dyn Fn(Ctx) -> Box<dyn OldBot> + Send>;
 
 pub struct Harness {
     factories: HashMap<String, BotFactory>,
@@ -67,7 +71,7 @@ impl Harness {
         }
     }
 
-    pub fn register<B: Bot>(&mut self, name: impl Into<String>) -> &mut Self {
+    pub fn register<B: OldBot>(&mut self, name: impl Into<String>) -> &mut Self {
         self.factories
             .insert(name.into(), Box::new(move |ctx| Box::new(B::new(ctx))));
 

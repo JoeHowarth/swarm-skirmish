@@ -1,5 +1,5 @@
 [workspace]
-members = ["server", "simple-bot", "swarm-lib", "web-ui-streamer"]
+members = [ "dylib-bot","server", "simple-bot", "swarm-lib", "web-ui-streamer"]
 resolver = "2"
 
 [profile.release]

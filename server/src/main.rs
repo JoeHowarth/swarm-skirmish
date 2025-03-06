@@ -20,20 +20,26 @@ use bevy::{
     prelude::*,
     state::state::FreelyMutableState,
     time::common_conditions::on_timer,
+    utils::HashMap,
 };
+use bot_update::{BotId, BotUpdatePlugin, BotUpdateSystemSet};
 use levels::{Levels, LevelsDiscriminants, LevelsPlugin};
 use serde::{Deserialize, Serialize};
-use server::{BotHandlerPlugin, BotId, ServerSystems};
 use strum::IntoDiscriminant;
-use subscriptions::{SubscriptionsPlugin, SubscriptionsSystemSet};
-use swarm_lib::{Energy, Item, Pos, Team};
+use swarm_lib::{
+    bot_harness::Bot,
+    ctx::{BotLogger, Ctx},
+    Energy,
+    Item,
+    Pos,
+    Team,
+};
 use tilemap::TilemapSystemSimUpdateSet;
 
 mod actions;
+mod bot_update;
 mod core;
 mod levels;
-mod server;
-mod subscriptions;
 mod tilemap;
 
 static MAP_SIZE: LazyLock<RwLock<Option<(usize, usize)>>> =
@@ -63,8 +69,11 @@ pub struct Args {
     pub height: Option<usize>,
 }
 
+use dlopen2::wrapper::{Container, WrapperApi};
+
 fn main() {
     let args: Args = argh::from_env();
+
 
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
@@ -76,11 +85,10 @@ fn main() {
         }))
         .add_plugins((
             tilemap::TilemapPlugin,
-            BotHandlerPlugin,
             ActionsPlugin,
-            SubscriptionsPlugin,
             CorePlugin,
             LevelsPlugin,
+            BotUpdatePlugin,
         ))
         .insert_state(
             args.level
@@ -102,11 +110,10 @@ fn main() {
         .configure_sets(
             Update,
             (
+                BotUpdateSystemSet,
                 ActionsSystemSet,
                 CoreSystemsSet,
                 TilemapSystemSimUpdateSet,
-                ServerSystems,
-                SubscriptionsSystemSet,
             )
                 .chain()
                 .run_if(in_state(GameState::InGame))

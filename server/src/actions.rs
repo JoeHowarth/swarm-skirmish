@@ -14,8 +14,8 @@ use swarm_lib::{
 };
 
 use crate::{
+    bot_update::{BotId, BotIdToEntity},
     core::{Inventory, SGridWorld, Tick},
-    server::{ActionRecv, BotId, BotIdToEntity},
     Pos,
 };
 
@@ -66,7 +66,7 @@ impl Plugin for ActionsPlugin {
         app.add_systems(
             Update,
             (
-                handle_incoming_bot_actions,
+                // handle_incoming_bot_actions,
                 handle_bot_actions,
                 process_computed_action,
             )
@@ -76,25 +76,25 @@ impl Plugin for ActionsPlugin {
     }
 }
 
-fn handle_incoming_bot_actions(
-    tick: Res<Tick>,
-    action_recv: Res<ActionRecv>,
-    mut queues: Query<&mut ActionQueue>,
-    bot_id_to_entity: Res<BotIdToEntity>,
-) {
-    while let Ok((bot_id, sent_tick, action)) = action_recv.0.try_recv() {
-        let entity = bot_id_to_entity.0.get(&bot_id).unwrap();
-        debug!(
-            bot_id = bot_id.0,
-            ?action,
-            entity = entity.index(),
-            sim_tick = tick.0,
-            sent_tick,
-            "Received bot action"
-        );
-        queues.get_mut(*entity).unwrap().0.push_back(action);
-    }
-}
+// fn handle_incoming_bot_actions(
+//     tick: Res<Tick>,
+//     action_recv: Res<ActionRecv>,
+//     mut queues: Query<&mut ActionQueue>,
+//     bot_id_to_entity: Res<BotIdToEntity>,
+// ) {
+//     while let Ok((bot_id, sent_tick, action)) = action_recv.0.try_recv() {
+//         let entity = bot_id_to_entity.0.get(&bot_id).unwrap();
+//         debug!(
+//             bot_id = bot_id.0,
+//             ?action,
+//             entity = entity.index(),
+//             sim_tick = tick.0,
+//             sent_tick,
+//             "Received bot action"
+//         );
+//         queues.get_mut(*entity).unwrap().0.push_back(action);
+//     }
+// }
 
 fn handle_bot_actions(
     mut query: Query<(

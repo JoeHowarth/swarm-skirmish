@@ -6,7 +6,7 @@ use swarm_lib::{
     gridworld::{GridWorld, PassableCell}, CellKind, Energy, Item, Pos
 };
 
-use crate::server::BotId;
+use crate::bot_update::BotId;
 pub type SGridWorld = GridWorld<CellState>;
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]

@@ -70,14 +70,14 @@ impl Plugin for BotHandlerPlugin {
                 bot_id_to_entity.0.remove(&bot_id);
 
                 // Send kill message to bot
-                world.resource::<KillBots>().0.send(bot_id.0).unwrap();
+                // world.resource::<KillBots>().0.send(bot_id.0).unwrap();
             });
 
-        app.init_resource::<BotIdToEntity>()
-            .insert_resource(NewBots(new_bots_tx))
-            .insert_resource(ServerUpdates(server_update_tx))
-            .insert_resource(ActionRecv(action_rx))
-            .insert_resource(KillBots(kill_bots_tx));
+        app.init_resource::<BotIdToEntity>();
+            // .insert_resource(NewBots(new_bots_tx))
+            // .insert_resource(ServerUpdates(server_update_tx))
+            // .insert_resource(ActionRecv(action_rx))
+            // .insert_resource(KillBots(kill_bots_tx));
 
         app.add_systems(Update, add_new_bots.in_set(ServerSystems));
 

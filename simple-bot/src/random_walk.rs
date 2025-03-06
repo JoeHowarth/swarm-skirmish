@@ -1,7 +1,7 @@
 use eyre::Result;
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use swarm_lib::{
-    bot_harness::{map_size, Bot},
+    bot_harness::{map_size, OldBot},
     ctx::Ctx,
     gridworld::GridWorld,
     Action,
@@ -21,7 +21,7 @@ pub struct RandomWalkBot {
     seen_bots: Vec<ClientBotData>,
 }
 
-impl Bot for RandomWalkBot {
+impl OldBot for RandomWalkBot {
     fn new(ctx: Ctx) -> Self {
         let (map_w, map_h) = map_size();
         Self {

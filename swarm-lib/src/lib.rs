@@ -29,7 +29,7 @@ pub struct ServerUpdateEnvelope {
     pub response: ServerUpdate,
 }
 // Server -> Bot: Full update on each tick with all data
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Component)]
 pub struct ServerUpdate {
     pub tick: u32,
 

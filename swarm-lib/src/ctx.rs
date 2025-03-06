@@ -64,8 +64,8 @@ pub struct LogEntry {
 
 /// Handles logging for a specific bot
 pub struct BotLogger {
-    bot_id: u32,
-    current_tick: u32,
+    pub bot_id: u32,
+    pub current_tick: u32,
     log_file: Option<File>,
     buffer: Vec<LogEntry>,
 }

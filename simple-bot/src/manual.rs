@@ -3,7 +3,7 @@ use std::io::stdin;
 use eyre::Result;
 use swarm_lib::{
     bevy_math::UVec2,
-    bot_harness::Bot,
+    bot_harness::OldBot,
     ctx::Ctx,
     Action,
     BotResponse,
@@ -15,7 +15,7 @@ pub struct TerminalControlledBot {
     rpc: Ctx,
 }
 
-impl Bot for TerminalControlledBot {
+impl OldBot for TerminalControlledBot {
     fn new(rpc: Ctx) -> Self {
         Self { rpc }
     }

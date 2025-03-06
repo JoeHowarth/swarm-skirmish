@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 swarm-lib = { path = "../swarm-lib" }
-bevy = { version = "0.15.0" }
+bevy = { version = "0.15.0", features = ["dynamic_linking"] }
 bevy_ecs_tilemap = "0.15.0"
 image = "0.25.5"
 bevy_pancam = "0.17"
@@ -15,7 +15,7 @@ eyre = "0.6"
 strum = "0.27"
 strum_macros = "0.27"
 bincode = { workspace = true }
-chrono = { workspace = true }
 serde_json = { workspace = true }
 argh = "0.1.13"
 rand = { version = "0.9", features = ["small_rng"] }
+dlopen2 = "0.7"
