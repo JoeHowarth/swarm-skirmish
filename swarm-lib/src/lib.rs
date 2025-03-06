@@ -6,10 +6,10 @@ use strum_macros::Display;
 
 pub mod boring_impls;
 pub mod bot_harness;
+pub mod ctx;
 pub mod gridworld;
 pub mod protocol;
 pub mod types;
-pub mod ctx;
 
 pub use types::*;
 
@@ -45,20 +45,24 @@ pub struct ServerUpdate {
 }
 
 // Bot -> Server: Optional response with actions
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct BotResponse {
-    // Actions to take (empty vec if none)
+    // Actions to take
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[serde(default)]
     pub actions: Vec<ActionEnvelope>,
+    // #[serde(skip_serializing_if = "Vec::is_empty")]
+    // #[serde(default)]
+    // pub cancel_actions: Vec<ActionId>,
+
+    // #[serde(default, skip_serializing_if = "is_true")]
+    // pub cancel_all_actions: bool,
 }
 
 impl BotResponse {
     /// Create a new empty BotResponse
     pub fn new() -> Self {
-        Self {
-            actions: Vec::new(),
-        }
+        Self::default()
     }
 
     /// Create a new BotResponseBuilder
@@ -157,4 +161,8 @@ pub struct JournalEntry {
     pub bot_id: Option<u32>,
     pub client_msg: Option<ClientMsg>,
     pub server_msg: Option<ServerMsg>,
+}
+
+fn is_true(b: &bool) -> bool {
+    *b
 }
