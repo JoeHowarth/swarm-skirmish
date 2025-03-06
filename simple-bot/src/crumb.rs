@@ -7,7 +7,8 @@ use rand::{
 use serde::{Deserialize, Serialize};
 use swarm_lib::{
     bevy_math::UVec2,
-    bot_harness::{map_size, Bot, Ctx},
+    bot_harness::{map_size, Bot},
+    ctx::Ctx,
     gridworld::{GridWorld, PassableCell},
     Action,
     ActionStatus,
@@ -42,14 +43,21 @@ impl CrumbFollower {
         radar: &RadarData,
         tick: u32,
     ) -> Action {
-        // Priority 1: Find and move toward Fent
-        if let Some((dir, _)) = radar.find_dirs(CellStateRadar::has_item(Fent))
+        // Go to known Fent location
+        if let Some((pos, cell)) =
+            self.grid.iter().find(|(_, cell)| cell.item == Some(Fent))
         {
-            self.ctx.debug("Found Fent");
-            return Action::MoveDir(dir);
+            let pos = Pos::from((pos.0, pos.1));
+            self.ctx.debug(format!(
+                "Going to Fent at position: {}. Last observed {}, {} ticks ago",
+                pos,
+                cell.last_observed,
+                tick - cell.last_observed
+            ));
+            return Action::MoveTo(Pos::from(pos));
         }
 
-        // Priority 2: Harvest nearby Truffle
+        // Harvest nearby Truffle
         if let Some((dir, _)) =
             radar.find_dirs(CellStateRadar::has_item(Truffle))
         {
@@ -57,14 +65,7 @@ impl CrumbFollower {
             return Action::Harvest(dir);
         }
 
-        // Priority 3: Follow Crumb
-        if let Some((_, cell)) = radar.find(CellStateRadar::has_item(Crumb)) {
-            self.ctx
-                .debug(format!("Found Crumb at world position: {}", cell.pos));
-            return Action::MoveTo(cell.pos);
-        }
-
-        // Priority 4: Go to known Truffle location
+        // Go to known Truffle location
         if let Some((pos, cell)) = self
             .grid
             .iter()
@@ -81,17 +82,24 @@ impl CrumbFollower {
             return Action::MoveTo(Pos::from(pos));
         }
 
-        // Priority 5: Explore random unknown cells
+        // Follow Crumb
+        if let Some((_, cell)) = radar.find(CellStateRadar::has_item(Crumb)) {
+            self.ctx
+                .debug(format!("Found Crumb at world position: {}", cell.pos));
+            return Action::MoveTo(cell.pos);
+        }
+
+        // Explore random unknown cells
         let unknown_cells: Vec<_> = self
             .grid
             .iter()
             .filter(|(_, cell)| cell.kind == CellKind::Unknown)
             .collect();
-            
+
         if !unknown_cells.is_empty() {
             let random_index = self.rng.random_range(0..unknown_cells.len());
             let (pos, _) = unknown_cells[random_index];
-            
+
             self.ctx.debug(format!(
                 "Found random unexplored cell at position: {}",
                 Pos::from(pos)
@@ -99,7 +107,7 @@ impl CrumbFollower {
             return Action::MoveTo(Pos::from(pos));
         }
 
-        // Priority 6: Random movement if nothing else to do
+        // Random movement if nothing else to do
         if self.rng.random_bool(0.2)
             || radar
                 .get_dir(self.default_dir)

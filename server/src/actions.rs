@@ -150,12 +150,22 @@ fn handle_bot_actions(
             Action::MoveTo(goal) => {
                 if goal == *pos {
                     debug!(?bot_id, ?goal, "Already at goal position");
+                    in_progress.opt = Some(ActionResult {
+                        action,
+                        id,
+                        status: ActionStatus::Success,
+                    });
                     continue;
                 }
 
                 debug!(?bot_id, ?pos, ?goal, "Finding path to goal");
                 let Some(path) = grid_world.find_path(*pos, goal) else {
                     warn!(?goal, ?bot_id, "Invalid goal");
+                    in_progress.opt = Some(ActionResult {
+                        action,
+                        id,
+                        status: ActionStatus::Failure("Invalid goal".into()),
+                    });
                     continue;
                 };
 
@@ -228,6 +238,10 @@ fn process_computed_action(
             );
             continue;
         };
+
+        if computed_queue.is_empty() {
+            continue;
+        }
 
         let computed = computed_queue.pop_front().unwrap();
         assert_eq!(

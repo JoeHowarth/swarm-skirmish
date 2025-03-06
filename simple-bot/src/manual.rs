@@ -3,7 +3,8 @@ use std::io::stdin;
 use eyre::Result;
 use swarm_lib::{
     bevy_math::UVec2,
-    bot_harness::{Bot, Ctx},
+    bot_harness::Bot,
+    ctx::Ctx,
     Action,
     BotResponse,
     Dir,
@@ -27,7 +28,10 @@ impl Bot for TerminalControlledBot {
 
         loop {
             // Wait for server update
-            let update = self.rpc.wait_for_latest_update();
+            let Some(update) = self.rpc.wait_for_latest_update() else {
+                // Bot was killed
+                return Ok(());
+            };
             self.rpc
                 .info(format!("Received update: tick={}", update.tick));
 
@@ -37,8 +41,10 @@ impl Bot for TerminalControlledBot {
             // Display position and radar data
             self.rpc
                 .info(format!("Current position: {:?}", update.position));
-            self.rpc
-                .debug(format!("Radar shows {} bots", update.radar.pawns.len()));
+            self.rpc.debug(format!(
+                "Radar shows {} bots",
+                update.radar.pawns.len()
+            ));
 
             // User interaction prompts still use println since they're for
             // direct user interaction

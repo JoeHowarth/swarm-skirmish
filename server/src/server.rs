@@ -23,7 +23,9 @@ use swarm_lib::{
 use crate::{
     actions::{ActionQueue, ComputedActionQueue, InProgressAction},
     core::PawnKind,
-    subscriptions::Subscriptions, MAP_SIZE,
+    get_map_size,
+    subscriptions::Subscriptions,
+    MAP_SIZE,
 };
 
 #[derive(Component, Debug, Clone, Copy, Hash, PartialEq, Eq)]
@@ -32,6 +34,9 @@ pub struct BotId(pub u32);
 
 #[derive(Resource)]
 pub struct NewBots(pub mpmc::Sender<(u32, PawnKind)>);
+
+#[derive(Resource)]
+pub struct KillBots(pub mpmc::Sender<u32>);
 
 #[derive(Resource)]
 pub struct ServerUpdates(pub mpmc::Sender<ServerUpdateEnvelope>);
@@ -52,16 +57,32 @@ impl Plugin for BotHandlerPlugin {
         let (new_bots_tx, new_bots_rx) = mpmc::channel();
         let (server_update_tx, server_update_rx) = mpmc::channel();
         let (action_tx, action_rx) = mpmc::channel();
+        let (kill_bots_tx, kill_bots_rx) = mpmc::channel();
+
+        app.world_mut()
+            .register_component_hooks::<BotId>()
+            .on_remove(|mut world, entity, _| {
+                let bot_id = *world.get::<BotId>(entity).unwrap();
+
+                // Remove bot_id from bot_id_to_entity
+                let mut bot_id_to_entity =
+                    world.get_resource_mut::<BotIdToEntity>().unwrap();
+                bot_id_to_entity.0.remove(&bot_id);
+
+                // Send kill message to bot
+                world.resource::<KillBots>().0.send(bot_id.0).unwrap();
+            });
 
         app.init_resource::<BotIdToEntity>()
             .insert_resource(NewBots(new_bots_tx))
             .insert_resource(ServerUpdates(server_update_tx))
-            .insert_resource(ActionRecv(action_rx));
+            .insert_resource(ActionRecv(action_rx))
+            .insert_resource(KillBots(kill_bots_tx));
 
         app.add_systems(Update, add_new_bots.in_set(ServerSystems));
 
         std::thread::spawn(move || {
-            server(new_bots_rx, server_update_rx, action_tx)
+            server(new_bots_rx, server_update_rx, action_tx, kill_bots_rx)
         });
     }
 }
@@ -91,6 +112,7 @@ fn server(
     new_bots_rx: mpmc::Receiver<(u32, PawnKind)>,
     server_update_rx: mpmc::Receiver<ServerUpdateEnvelope>,
     action_tx: mpmc::Sender<(BotId, u32, ActionEnvelope)>,
+    kill_bots_rx: mpmc::Receiver<u32>,
 ) {
     let listener = TcpListener::bind("127.0.0.1:1234").unwrap();
 
@@ -100,11 +122,13 @@ fn server(
         let new_bots_rx = new_bots_rx.clone();
         let server_update_rx = server_update_rx.clone();
         let action_tx = action_tx.clone();
+        let kill_bots_rx = kill_bots_rx.clone();
 
         std::thread::spawn(move || {
             if let Err(e) = handle_connection(
                 stream,
                 new_bots_rx,
+                kill_bots_rx,
                 server_update_rx,
                 action_tx,
             ) {
@@ -117,6 +141,7 @@ fn server(
 fn handle_connection(
     stream: TcpStream,
     new_bots_rx: mpmc::Receiver<(u32, PawnKind)>,
+    kill_bots_rx: mpmc::Receiver<u32>,
     server_update_rx: mpmc::Receiver<ServerUpdateEnvelope>,
     action_tx: mpmc::Sender<(BotId, u32, ActionEnvelope)>,
 ) -> Result<()> {
@@ -129,7 +154,14 @@ fn handle_connection(
     }
 
     // Send ConnectAck
-    writer.write_message(&ServerMsg::ConnectAck { map_size: MAP_SIZE })?;
+    loop {
+        if let Some(map_size) = get_map_size() {
+            writer.write_message(&ServerMsg::ConnectAck { map_size })?;
+            break;
+        }
+
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
 
     std::thread::spawn(move || {
         let mut reader = reader;
@@ -168,6 +200,11 @@ fn handle_connection(
             writer
                 .write_message(&ServerMsg::ServerUpdate(server_update))
                 .unwrap();
+        }
+
+        if let Ok(bot_id) = kill_bots_rx.try_recv() {
+            info!("Killing bot: {}", bot_id);
+            writer.write_message(&ServerMsg::KillBot(bot_id)).unwrap();
         }
     }
 }

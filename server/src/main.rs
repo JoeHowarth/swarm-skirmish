@@ -9,24 +9,63 @@ use core::{
     PawnKind,
     SGridWorld as GridWorld,
 };
-use std::time::Duration;
+use std::{
+    sync::{Arc, LazyLock, OnceLock, RwLock},
+    time::Duration,
+};
 
 use actions::{ActionsPlugin, ActionsSystemSet};
-use bevy::{prelude::*, time::common_conditions::on_timer};
+use argh::{FromArgValue, FromArgs};
+use bevy::{
+    prelude::*,
+    state::state::FreelyMutableState,
+    time::common_conditions::on_timer,
+};
+use levels::{Levels, LevelsDiscriminants, LevelsPlugin};
+use serde::{Deserialize, Serialize};
 use server::{BotHandlerPlugin, BotId, ServerSystems};
+use strum::IntoDiscriminant;
 use subscriptions::{SubscriptionsPlugin, SubscriptionsSystemSet};
 use swarm_lib::{Energy, Item, Pos, Team};
-use tilemap::TilemapSystemSet;
+use tilemap::TilemapSystemSimUpdateSet;
 
 mod actions;
 mod core;
+mod levels;
 mod server;
 mod subscriptions;
 mod tilemap;
 
-pub const MAP_SIZE: (usize, usize) = (50, 50);
+static MAP_SIZE: LazyLock<RwLock<Option<(usize, usize)>>> =
+    LazyLock::new(|| RwLock::new(None));
+
+pub fn get_map_size() -> Option<(usize, usize)> {
+    MAP_SIZE.read().expect("Failed to read RWLock").clone()
+}
+
+#[derive(FromArgs)]
+/// Swarm Server
+pub struct Args {
+    #[argh(subcommand)]
+    /// the level to load
+    pub level: Option<Levels>,
+
+    #[argh(option, default = "500")]
+    /// the tick rate in milliseconds
+    pub tick_ms: u64,
+
+    #[argh(option)]
+    /// the width of the map
+    pub width: Option<usize>,
+
+    #[argh(option)]
+    /// the height of the map
+    pub height: Option<usize>,
+}
 
 fn main() {
+    let args: Args = argh::from_env();
+
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
@@ -41,73 +80,47 @@ fn main() {
             ActionsPlugin,
             SubscriptionsPlugin,
             CorePlugin,
+            LevelsPlugin,
         ))
-        .add_systems(Startup, (camera_setup, init_map))
+        .insert_state(
+            args.level
+                .as_ref()
+                .unwrap_or(&Levels::default())
+                .discriminant(),
+        )
+        .insert_resource(args.level.unwrap_or_default())
+        .insert_state(GameState::Idle)
+        .add_systems(Startup, camera_setup)
+        .add_systems(
+            OnExit(GameState::InGame),
+            |mut commands: Commands, pawns: Query<Entity, With<PawnKind>>| {
+                for pawn in pawns.iter() {
+                    commands.entity(pawn).despawn_recursive();
+                }
+            },
+        )
         .configure_sets(
             Update,
             (
                 ActionsSystemSet,
                 CoreSystemsSet,
-                TilemapSystemSet,
+                TilemapSystemSimUpdateSet,
                 ServerSystems,
                 SubscriptionsSystemSet,
             )
                 .chain()
-                .run_if(on_timer(Duration::from_millis(500))),
+                .run_if(in_state(GameState::InGame))
+                .run_if(on_timer(Duration::from_millis(args.tick_ms))),
         )
         .add_systems(Update, (exit_system, check_win_condition, display_win_ui))
         .run();
 }
 
-fn init_map(mut commands: Commands) {
-    let mut grid_world =
-        GridWorld::new(MAP_SIZE.0, MAP_SIZE.1, CellState::empty());
-
-    let player = commands
-        .spawn((
-            PawnKind::default(),
-            Team::Player,
-            Energy(100),
-            Pos((2, 2).into()),
-        ))
-        .id();
-
-    // let enemy = commands
-    //     .spawn((PawnKind::FindBot, Team::Enemy, Pos((13, 13).into())))
-    //     .id();
-
-    grid_world.set(2, 2, CellState::new_with_pawn(player));
-    // grid_world.set(13, 13, CellState::new_with_pawn(enemy));
-
-    for y in 1..10 {
-        grid_world.set(10, y, CellState::blocked());
-    }
-
-    // Add crumbs
-    for coord in grid_world.find_path((5, 3), (8, 13)).unwrap() {
-        let cell = grid_world.get_pos_mut(coord);
-        cell.item = Some(Item::Crumb);
-    }
-    // Add fent at end of crumb trail
-    grid_world.get_mut(8, 14).item = Some(Item::Fent);
-
-    grid_world.get_mut(2, 8).item = Some(Item::Truffle);
-    grid_world.get_mut(12, 2).item = Some(Item::Truffle);
-
-    // Add a border of Blocked cells around the edge of the grid
-    for x in 0..MAP_SIZE.0 {
-        // Top and bottom borders
-        grid_world.set(x, 0, CellState::blocked());
-        grid_world.set(x, MAP_SIZE.1 - 1, CellState::blocked());
-    }
-
-    for y in 0..MAP_SIZE.1 {
-        // Left and right borders
-        grid_world.set(0, y, CellState::blocked());
-        grid_world.set(MAP_SIZE.0 - 1, y, CellState::blocked());
-    }
-
-    commands.insert_resource(grid_world);
+#[derive(States, Hash, Eq, PartialEq, Clone, Debug, Default)]
+pub enum GameState {
+    #[default]
+    Idle,
+    InGame,
 }
 
 pub fn camera_setup(mut commands: Commands) {
@@ -143,6 +156,7 @@ fn check_win_condition(
     mut commands: Commands,
     query: Query<(&BotId, &Inventory, &Team)>,
     won: Option<Res<Won>>,
+    mut next_state: ResMut<NextState<GameState>>,
 ) {
     if won.is_some() {
         return;
@@ -163,6 +177,7 @@ fn check_win_condition(
         }
         info!("Team {team} won! Bot {bot:?} picked up the Fent and 2 Truffles");
         commands.insert_resource(Won(*team));
+        next_state.set(GameState::Idle);
     }
 }
 

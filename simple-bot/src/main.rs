@@ -4,7 +4,8 @@ use eyre::Result;
 use random_walk::RandomWalkBot;
 use serde::{Deserialize, Serialize};
 use swarm_lib::{
-    bot_harness::{Bot, Ctx, Harness},
+    bot_harness::{Bot, Harness},
+    ctx::Ctx,
     gridworld::{GridWorld, PassableCell},
     BotResponse,
     CellKind,
@@ -36,7 +37,10 @@ pub fn run_loop(updater: &mut impl BotUpdate) -> Result<()> {
 
     loop {
         // Wait for server update
-        let update = updater.ctx().wait_for_latest_update();
+        let Some(update) = updater.ctx().wait_for_latest_update() else {
+            // Bot was killed
+            return Ok(())
+        };
 
         let (known_map, known_bots) = updater.known_map();
 

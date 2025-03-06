@@ -1,7 +1,8 @@
 use eyre::Result;
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use swarm_lib::{
-    bot_harness::{map_size, Bot, Ctx},
+    bot_harness::{map_size, Bot},
+    ctx::Ctx,
     gridworld::GridWorld,
     Action,
     BotResponse,

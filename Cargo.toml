@@ -2,10 +2,8 @@
 members = ["server", "simple-bot", "swarm-lib", "web-ui-streamer"]
 resolver = "2"
 
-
 [profile.release]
 debug = true
-
 
 [workspace.dependencies]
 thiserror = "2.0"
@@ -17,3 +15,11 @@ futures = "0.3"
 eyre = "0.6"
 chrono = "0.4"
 array2d = "0.3"
+
+# Enable a small amount of optimization in the dev profile.
+[profile.dev]
+opt-level = 1
+
+# Enable a large amount of optimization in the dev profile for dependencies.
+[profile.dev.package."*"]
+opt-level = 3

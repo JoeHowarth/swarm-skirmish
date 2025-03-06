@@ -17,3 +17,5 @@ strum_macros = "0.27"
 bincode = { workspace = true }
 chrono = { workspace = true }
 serde_json = { workspace = true }
+argh = "0.1.13"
+rand = { version = "0.9", features = ["small_rng"] }

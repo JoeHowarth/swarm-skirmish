@@ -14,20 +14,32 @@ use crate::{
         ComputedActionQueue,
     },
     core::{Inventory, SGridWorld as GridWorld, Tick},
+    get_map_size,
     CellState,
+    GameState,
     Item,
     MAP_SIZE,
 };
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
-pub struct TilemapSystemSet;
+pub struct TilemapSystemSimUpdateSet;
+#[derive(Debug)]
+pub enum CellRender {
+    Empty,
+    Blocked,
+    Pawn(bool),
+    Item(Item),
+}
+
+#[derive(Resource)]
+struct AsciiTexture(Handle<Image>);
 
 pub struct TilemapPlugin;
 
 impl Plugin for TilemapPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(bevy_ecs_tilemap::TilemapPlugin);
-        app.add_systems(Startup, (load_tileset, setup_map).chain());
+        app.add_systems(Startup, load_tileset);
         // Initialize the TilemapWorldCoords resource with default values
         app.insert_resource(TilemapWorldCoords {
             transform: Transform::default(),
@@ -35,17 +47,29 @@ impl Plugin for TilemapPlugin {
             map_type: TilemapType::Square,
         });
         // Add system to update the resource
-        app.add_systems(Update, update_tilemap_world_coords);
-        app.add_systems(Update, render_move_to);
-        app.add_systems(Update, (render_grid).in_set(TilemapSystemSet));
+        app.add_systems(OnEnter(GameState::InGame), setup_map);
+        app.add_systems(OnExit(GameState::InGame), remove_map);
+        app.add_systems(
+            Update,
+            (render_move_to, update_tilemap_world_coords)
+                .run_if(in_state(GameState::InGame)),
+        );
+        app.add_systems(
+            Update,
+            (render_grid).in_set(TilemapSystemSimUpdateSet),
+        );
     }
 }
 
 fn render_move_to(
     mut gizmos: Gizmos,
     actions: Query<(&Pos, &ComputedActionQueue)>,
-    tilemap_coords: Res<TilemapWorldCoords>,
+    tilemap_coords: Option<Res<TilemapWorldCoords>>,
 ) {
+    let Some(tilemap_coords) = tilemap_coords else {
+        return;
+    };
+
     for (pos, computed_action) in actions.iter() {
         let mut pos = *pos;
         for action in &computed_action.0 {
@@ -68,81 +92,62 @@ fn render_move_to(
     }
 }
 
-/// Resource that stores the components needed for world coordinate conversion
-#[derive(Resource)]
-pub struct TilemapWorldCoords {
-    pub transform: Transform,
-    pub grid_size: TilemapGridSize,
-    pub map_type: TilemapType,
-}
+fn setup_map(mut commands: Commands, ascii_texture: Res<AsciiTexture>) {
+    let Some((x, y)) = get_map_size() else {
+        return;
+    };
+    let map_size = TilemapSize {
+        x: x as u32,
+        y: y as u32,
+    };
+    let tile_size = TilemapTileSize { x: 18.0, y: 18.0 };
+    let grid_size = TilemapGridSize { x: 18.0, y: 18.0 };
 
-impl TilemapWorldCoords {
-    /// Converts a game position (Pos) to world coordinates (Vec2)
-    pub fn pos_to_world(&self, pos: &Pos) -> Vec2 {
-        let tile_pos = TilePos {
-            x: pos.x() as u32,
-            y: pos.y() as u32,
-        };
+    // Create tilemap entity early to register with each tile entity
+    let tilemap_entity = commands.spawn_empty().id();
 
-        // Get the position in tilemap's local space
-        let local_pos =
-            tile_pos.center_in_world(&self.grid_size, &self.map_type);
+    // Create tile storage
+    let mut tile_storage = TileStorage::empty(map_size);
 
-        // Add the tilemap's translation to get world coordinates
-        local_pos + self.transform.translation.xy()
+    // Spawn all tiles
+    for x in 0..map_size.x {
+        for y in 0..map_size.y {
+            let tile_pos = TilePos { x, y };
+            let tile_entity = commands
+                .spawn(TileBundle {
+                    position: tile_pos,
+                    texture_index: CellRender::Blocked.cell_to_tile(),
+                    tilemap_id: TilemapId(tilemap_entity),
+                    ..default()
+                })
+                .id();
+            tile_storage.set(&tile_pos, tile_entity);
+        }
     }
+
+    let map_type = TilemapType::Square;
+
+    // Spawn the map entity with all required components
+    commands.entity(tilemap_entity).insert(TilemapBundle {
+        grid_size,
+        map_type,
+        size: map_size,
+        storage: tile_storage,
+        texture: TilemapTexture::Single(ascii_texture.0.clone()),
+        tile_size,
+        transform: get_tilemap_center_transform(
+            &map_size, &grid_size, &map_type, -1.0,
+        ),
+        ..Default::default()
+    });
 }
 
-/// System to update the TilemapWorldCoords resource with the latest component
-/// values
-fn update_tilemap_world_coords(
-    tilemap: Query<(&Transform, &TilemapGridSize, &TilemapType)>,
-    mut coords: ResMut<TilemapWorldCoords>,
+fn remove_map(
+    mut commands: Commands,
+    tilemap: Query<Entity, With<TilemapTexture>>,
 ) {
-    if let Ok((transform, grid_size, map_type)) = tilemap.get_single() {
-        coords.transform = *transform;
-        coords.grid_size = *grid_size;
-        coords.map_type = *map_type;
-    }
-}
-
-#[derive(Debug)]
-pub enum CellRender {
-    Empty,
-    Blocked,
-    Pawn(bool),
-    Item(Item),
-}
-
-impl CellRender {
-    pub fn cell_to_tile(&self) -> TileTextureIndex {
-        TileTextureIndex(match self {
-            CellRender::Empty => 0,
-            CellRender::Blocked => 179,
-            CellRender::Pawn(true) => 1,
-            CellRender::Pawn(false) => 2,
-            CellRender::Item(Item::Crumb) => 250,
-            CellRender::Item(Item::Fent) => 239,
-            CellRender::Item(Item::Truffle) => 84, // 'T' in ASCII
-        })
-    }
-
-    pub fn from_state(state: &CellState, teams: &Query<&Team>) -> CellRender {
-        if let Some(pawn_id) = state.pawn {
-            return CellRender::Pawn(
-                teams.get(pawn_id).unwrap() == &Team::Player,
-            );
-        }
-
-        if let Some(item) = state.item {
-            return CellRender::Item(item);
-        }
-
-        match state.kind {
-            CellKind::Empty => CellRender::Empty,
-            CellKind::Blocked => CellRender::Blocked,
-            CellKind::Unknown => unreachable!(),
-        }
+    for tilemap in tilemap.iter() {
+        commands.entity(tilemap).despawn_recursive();
     }
 }
 
@@ -201,52 +206,76 @@ fn process_magenta_to_black(image: DynamicImage) -> DynamicImage {
     DynamicImage::ImageRgba8(rgba_image)
 }
 
-#[derive(Resource)]
-struct AsciiTexture(Handle<Image>);
-
-fn setup_map(mut commands: Commands, ascii_texture: Res<AsciiTexture>) {
-    let map_size = TilemapSize {
-        x: MAP_SIZE.0 as u32,
-        y: MAP_SIZE.1 as u32,
-    };
-    let tile_size = TilemapTileSize { x: 18.0, y: 18.0 };
-    let grid_size = TilemapGridSize { x: 18.0, y: 18.0 };
-
-    // Create tilemap entity early to register with each tile entity
-    let tilemap_entity = commands.spawn_empty().id();
-
-    // Create tile storage
-    let mut tile_storage = TileStorage::empty(map_size);
-
-    // Spawn all tiles
-    for x in 0..map_size.x {
-        for y in 0..map_size.y {
-            let tile_pos = TilePos { x, y };
-            let tile_entity = commands
-                .spawn(TileBundle {
-                    position: tile_pos,
-                    texture_index: CellRender::Blocked.cell_to_tile(),
-                    tilemap_id: TilemapId(tilemap_entity),
-                    ..default()
-                })
-                .id();
-            tile_storage.set(&tile_pos, tile_entity);
-        }
+impl CellRender {
+    pub fn cell_to_tile(&self) -> TileTextureIndex {
+        TileTextureIndex(match self {
+            CellRender::Empty => 0,
+            CellRender::Blocked => 219,
+            CellRender::Pawn(true) => 1,
+            CellRender::Pawn(false) => 2,
+            CellRender::Item(Item::Crumb) => 250,
+            CellRender::Item(Item::Fent) => 239,
+            CellRender::Item(Item::Truffle) => 84, // 'T' in ASCII
+        })
     }
 
-    let map_type = TilemapType::Square;
+    pub fn from_state(state: &CellState, teams: &Query<&Team>) -> CellRender {
+        if let Some(pawn_id) = state.pawn {
+            return CellRender::Pawn(
+                teams.get(pawn_id).unwrap() == &Team::Player,
+            );
+        }
 
-    // Spawn the map entity with all required components
-    commands.entity(tilemap_entity).insert(TilemapBundle {
-        grid_size,
-        map_type,
-        size: map_size,
-        storage: tile_storage,
-        texture: TilemapTexture::Single(ascii_texture.0.clone()),
-        tile_size,
-        transform: get_tilemap_center_transform(
-            &map_size, &grid_size, &map_type, -1.0,
-        ),
-        ..Default::default()
-    });
+        if let Some(item) = state.item {
+            return CellRender::Item(item);
+        }
+
+        match state.kind {
+            CellKind::Empty => CellRender::Empty,
+            CellKind::Blocked => CellRender::Blocked,
+            CellKind::Unknown => unreachable!(),
+        }
+    }
+}
+
+/// Resource that stores the components needed for world coordinate conversion
+#[derive(Resource)]
+pub struct TilemapWorldCoords {
+    pub transform: Transform,
+    pub grid_size: TilemapGridSize,
+    pub map_type: TilemapType,
+}
+
+impl TilemapWorldCoords {
+    /// Converts a game position (Pos) to world coordinates (Vec2)
+    pub fn pos_to_world(&self, pos: &Pos) -> Vec2 {
+        let tile_pos = TilePos {
+            x: pos.x() as u32,
+            y: pos.y() as u32,
+        };
+
+        // Get the position in tilemap's local space
+        let local_pos =
+            tile_pos.center_in_world(&self.grid_size, &self.map_type);
+
+        // Add the tilemap's translation to get world coordinates
+        local_pos + self.transform.translation.xy()
+    }
+}
+
+/// System to update the TilemapWorldCoords resource with the latest component
+/// values
+fn update_tilemap_world_coords(
+    tilemap: Query<(&Transform, &TilemapGridSize, &TilemapType)>,
+    mut coords: Option<ResMut<TilemapWorldCoords>>,
+) {
+    let Some(mut coords) = coords else {
+        return;
+    };
+
+    if let Ok((transform, grid_size, map_type)) = tilemap.get_single() {
+        coords.transform = *transform;
+        coords.grid_size = *grid_size;
+        coords.map_type = *map_type;
+    }
 }

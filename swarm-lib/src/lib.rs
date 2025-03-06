@@ -9,16 +9,30 @@ pub mod bot_harness;
 pub mod gridworld;
 pub mod protocol;
 pub mod types;
+pub mod ctx;
 
 pub use types::*;
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ServerMsg {
+    ConnectAck { map_size: (usize, usize) },
+    AssignBot(u32, String),
+    KillBot(u32),
+    ServerUpdate(ServerUpdateEnvelope),
+    Close,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServerUpdateEnvelope {
+    pub bot_id: u32,
+    pub seq: u32,
+    pub response: ServerUpdate,
+}
 // Server -> Bot: Full update on each tick with all data
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerUpdate {
-    // Always present
     pub tick: u32,
 
-    // Bot state - always included now
     pub team: Team,
     pub position: Pos,
     pub radar: RadarData,
@@ -28,8 +42,6 @@ pub struct ServerUpdate {
     // Results from previous actions
     #[serde(default)]
     pub action_result: Option<ActionResult>,
-    // Server messages (errors, notifications, etc.)
-    // pub messages: Vec<ServerMessage>,
 }
 
 // Bot -> Server: Optional response with actions
@@ -66,21 +78,6 @@ pub struct BotMsgEnvelope {
     pub bot_id: u32,
     pub tick: u32,
     pub msg: BotResponse,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ServerMsg {
-    ConnectAck { map_size: (usize, usize) },
-    AssignBot(u32, String),
-    ServerUpdate(ServerUpdateEnvelope),
-    Close,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ServerUpdateEnvelope {
-    pub bot_id: u32,
-    pub seq: u32,
-    pub response: ServerUpdate,
 }
 
 #[derive(
