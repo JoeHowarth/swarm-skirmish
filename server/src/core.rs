@@ -2,16 +2,13 @@ use std::fmt::Write;
 
 use bevy::{prelude::*, utils::HashMap};
 use strum_macros::Display;
-use swarm_lib::{
-    gridworld::{GridWorld, PassableCell},
-    CellKind,
-    Energy,
-    Item,
-    Pos,
-};
+use swarm_lib::{gridworld::PassableCell, CellKind, Energy, Item, Pos};
 
-use crate::bot_update::BotId;
-pub type SGridWorld = GridWorld<CellState>;
+use crate::{
+    apply_actions::{ActionQueue, ComputedActionQueue, InProgressAction},
+    bot_update::BotId,
+    types::{GridWorld, Inventory, PawnKind, Tick},
+};
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
 pub struct CoreSystemsSet;
@@ -27,76 +24,13 @@ impl Plugin for CorePlugin {
     }
 }
 
-#[derive(Resource, Default)]
-pub struct Tick(pub u32);
-
-#[derive(Component, Default, Display, Copy, Clone)]
-#[require(Inventory, Energy)]
-pub enum PawnKind {
-    #[default]
-    Basic,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct CellState {
-    pub kind: CellKind,
-    pub pawn: Option<Entity>,
-    pub item: Option<Item>,
-}
-
-impl CellState {
-    pub fn empty() -> CellState {
-        CellState {
-            kind: CellKind::Empty,
-            ..default()
-        }
-    }
-
-    pub fn blocked() -> CellState {
-        CellState {
-            kind: CellKind::Blocked,
-            ..default()
-        }
-    }
-
-    pub fn new_with_pawn(pawn: Entity) -> CellState {
-        CellState {
-            kind: CellKind::Empty,
-            pawn: Some(pawn),
-            ..default()
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn new_with_item(item: Item) -> CellState {
-        CellState {
-            kind: CellKind::Empty,
-            item: Some(item),
-            ..default()
-        }
-    }
-
-    pub fn can_enter(&self) -> bool {
-        self.kind == CellKind::Empty && self.pawn.is_none()
-    }
-}
-
-impl PassableCell for CellState {
-    fn is_blocked(&self) -> bool {
-        !self.can_enter()
-    }
-}
-
 fn update_tick(mut tick: ResMut<Tick>) {
     tick.0 += 1;
     debug!("Tick: {}", tick.0);
 }
 
-#[derive(Component, Default, Deref, DerefMut)]
-pub struct Inventory(pub HashMap<Item, u32>);
-
 fn pickup_crumbs(
-    mut grid_world: ResMut<SGridWorld>,
+    mut grid_world: ResMut<GridWorld>,
     mut pawns: Query<(&PawnKind, &BotId, &mut Inventory, &Pos)>,
 ) {
     for (pawn_kind, bot_id, mut inventory, pos) in pawns.iter_mut() {
@@ -110,7 +44,7 @@ fn pickup_crumbs(
 }
 
 fn pickup_fent(
-    mut grid_world: ResMut<SGridWorld>,
+    mut grid_world: ResMut<GridWorld>,
     mut pawns: Query<(&PawnKind, &BotId, &mut Inventory, &Pos)>,
 ) {
     for (pawn_kind, bot_id, mut inventory, pos) in pawns.iter_mut() {

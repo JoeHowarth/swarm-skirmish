@@ -3,19 +3,19 @@ use dlopen2::wrapper::{Container, WrapperApi};
 use swarm_lib::{
     bot_logger::BotLogger,
     Bot,
+    BotUpdate,
     CellKind,
     CellStateRadar,
     Energy,
     Pos,
     RadarBotData,
     RadarData,
-    BotUpdate,
     Team,
 };
 
 use crate::{
     apply_actions::{ActionQueue, ComputedActionQueue, InProgressAction},
-    core::{Inventory, PawnKind, SGridWorld as GridWorld, Tick},
+    types::{GridWorld, Inventory, PawnKind, Tick},
 };
 
 #[derive(WrapperApi)]

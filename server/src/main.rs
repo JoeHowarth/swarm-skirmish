@@ -1,14 +1,7 @@
 #![allow(unused_imports)]
 #![feature(mpmc_channel)]
 
-use core::{
-    CellState,
-    CorePlugin,
-    CoreSystemsSet,
-    Inventory,
-    PawnKind,
-    SGridWorld as GridWorld,
-};
+use core::{CorePlugin, CoreSystemsSet};
 use std::{
     sync::{Arc, LazyLock, OnceLock, RwLock},
     time::Duration,
@@ -28,12 +21,14 @@ use serde::{Deserialize, Serialize};
 use strum::IntoDiscriminant;
 use swarm_lib::{bot_logger::BotLogger, Bot, Energy, Item, Pos, Team};
 use tilemap::TilemapSystemSimUpdateSet;
+use types::{CellState, GridWorld, Inventory, PawnKind};
 
 mod apply_actions;
 mod bot_update;
 mod core;
 mod levels;
 mod tilemap;
+mod types;
 
 static MAP_SIZE: LazyLock<RwLock<Option<(usize, usize)>>> =
     LazyLock::new(|| RwLock::new(None));

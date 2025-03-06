@@ -6,18 +6,16 @@ use bevy::{
 };
 use bevy_ecs_tilemap::prelude::*;
 use image::DynamicImage;
-use swarm_lib::{CellKind, Pos, Team};
+use swarm_lib::{CellKind, Item, Pos, Team};
 
 use crate::{
     apply_actions::{
         ComputedActionKind::{Harvest, MoveDir},
         ComputedActionQueue,
     },
-    core::{Inventory, SGridWorld as GridWorld, Tick},
     get_map_size,
-    CellState,
+    types::{CellState, GridWorld},
     GameState,
-    Item,
     MAP_SIZE,
 };
 
