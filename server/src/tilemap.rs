@@ -9,7 +9,7 @@ use image::DynamicImage;
 use swarm_lib::{CellKind, Pos, Team};
 
 use crate::{
-    actions::{
+    apply_actions::{
         ComputedActionKind::{Harvest, MoveDir},
         ComputedActionQueue,
     },

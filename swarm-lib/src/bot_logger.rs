@@ -3,25 +3,10 @@ use std::{
     fs::{File, OpenOptions},
     io::Write,
     path::PathBuf,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        mpsc::{Receiver, Sender},
-        Arc,
-    },
-    time::Duration,
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use chrono::Local;
-
-use crate::{
-    BotMsgEnvelope,
-    BotResponse,
-    CellKind,
-    RadarData,
-    ServerUpdate,
-    ServerUpdateEnvelope,
-    Team,
-};
+use crate::{CellKind, RadarData, Team};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LogLevel {
@@ -156,7 +141,7 @@ impl BotLogger {
     /// Write a log entry to the bot's log file
     fn write_to_file(&mut self, entry: &LogEntry) {
         if let Some(file) = &mut self.log_file {
-            let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S%.3f");
+            let timestamp = format_system_time(SystemTime::now());
             let mut line = format!(
                 "[{}] [Tick {}] [{}] {}\n",
                 timestamp,
@@ -229,136 +214,85 @@ impl BotLogger {
     }
 }
 
-pub struct Ctx {
-    pub bot_id: u32,
-    pub last_received_tick: u32,
-    pub resp_rx: Receiver<ServerUpdateEnvelope>,
-    pub bot_msg_tx: Sender<BotMsgEnvelope>,
-    pub logger: BotLogger,
-    pub kill_signal: Arc<AtomicBool>,
+/// Format a SystemTime into a string with format "YYYY-MM-DD HH:MM:SS.mmm"
+fn format_system_time(time: SystemTime) -> String {
+    // Convert to duration since UNIX_EPOCH
+    let duration = time
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or(Duration::from_secs(0));
+
+    // Extract seconds and calculate date/time components
+    let secs = duration.as_secs();
+    let millis = duration.subsec_millis();
+
+    // Convert to seconds, minutes, hours
+    let secs_of_day = secs % 86400;
+    let hours = secs_of_day / 3600;
+    let minutes = (secs_of_day % 3600) / 60;
+    let seconds = secs_of_day % 60;
+
+    // Calculate days since epoch
+    let days_since_epoch = secs / 86400;
+
+    // Simple algorithm to calculate year, month, day
+    // This is a basic implementation that doesn't account for leap seconds
+    // and uses a simplified leap year calculation
+    let mut year = 1970;
+    let mut days_remaining = days_since_epoch;
+
+    // Advance years
+    loop {
+        let days_in_year = if is_leap_year(year) { 366 } else { 365 };
+        if days_remaining >= days_in_year {
+            days_remaining -= days_in_year;
+            year += 1;
+        } else {
+            break;
+        }
+    }
+
+    // Calculate month and day
+    let days_in_month = [
+        31,
+        if is_leap_year(year) { 29 } else { 28 },
+        31,
+        30,
+        31,
+        30,
+        31,
+        31,
+        30,
+        31,
+        30,
+        31,
+    ];
+
+    let mut month = 0;
+    while month < 12 && days_remaining >= days_in_month[month] {
+        days_remaining -= days_in_month[month];
+        month += 1;
+    }
+
+    // days_remaining is now the day of the month (0-based)
+    let day = days_remaining + 1;
+
+    // Format the date and time
+    format!(
+        "{:04}-{:02}-{:02} {:02}:{:02}:{:02}.{:03}",
+        year,
+        month + 1, // Convert to 1-based month
+        day,
+        hours,
+        minutes,
+        seconds,
+        millis
+    )
 }
 
-impl Ctx {
-    pub fn new(
-        bot_id: u32,
-        resp_rx: Receiver<ServerUpdateEnvelope>,
-        bot_msg_tx: Sender<BotMsgEnvelope>,
-        kill_signal: Arc<AtomicBool>,
-    ) -> Self {
-        Ctx {
-            bot_id,
-            last_received_tick: 0,
-            resp_rx,
-            bot_msg_tx,
-            logger: BotLogger::new(bot_id),
-            kill_signal,
-        }
-    }
-
-    /// Wait for an update from the server, skipping until we get to the latest
-    /// received tick
-    /// `None` indicates we should shut down this bot
-    pub fn wait_for_latest_update(&mut self) -> Option<ServerUpdate> {
-        let mut update = self.wait_for_update()?;
-
-        let mut skipped = 0;
-
-        // drain the channel
-        while let Ok(new_update) = self.resp_rx.try_recv() {
-            skipped += 1;
-            update = new_update.response;
-        }
-
-        self.debug(format!("Skipped {skipped}"));
-
-        // Update the logger's tick
-        self.logger.set_tick(update.tick);
-        self.last_received_tick = update.tick;
-
-        Some(update)
-    }
-
-    /// Wait for an update from the server
-    /// `None` indicates we should shut down this bot
-    pub fn wait_for_update(&mut self) -> Option<ServerUpdate> {
-        loop {
-            if let Ok(update) =
-                self.resp_rx.recv_timeout(Duration::from_millis(100))
-            {
-                // Update the logger's tick
-                self.logger.set_tick(update.response.tick);
-                self.last_received_tick = update.response.tick;
-
-                return Some(update.response);
-            }
-
-            if self.kill_signal.load(Ordering::SeqCst) {
-                self.info("Kill signal received, exiting...");
-                self.logger.flush_buffer_to_stdout();
-                return None;
-            }
-        }
-    }
-
-    pub fn send_msg(&mut self, bot_msg: BotResponse) {
-        self.debug(format!("Actions: {:?}", &bot_msg.actions));
-
-        let envelope = BotMsgEnvelope {
-            bot_id: self.bot_id,
-            tick: self.last_received_tick,
-            msg: bot_msg,
-        };
-
-        self.bot_msg_tx
-            .send(envelope)
-            .expect("Failed to send bot message");
-    }
-
-    /// Log a message at info level
-    pub fn logln(&mut self, message: impl Into<String>) {
-        self.logger.info(message);
-    }
-
-    /// Log a message with custom attributes
-    pub fn log_with_attrs(
-        &mut self,
-        message: impl Into<String>,
-        attrs: HashMap<String, String>,
-    ) {
-        self.logger.log_with_attrs(LogLevel::Info, message, attrs);
-    }
-
-    /// Log a debug message
-    pub fn debug(&mut self, message: impl Into<String>) {
-        self.logger.debug(message);
-    }
-
-    /// Log an info message
-    pub fn info(&mut self, message: impl Into<String>) {
-        self.logger.info(message);
-    }
-
-    /// Log a warning message
-    pub fn warn(&mut self, message: impl Into<String>) {
-        self.logger.warn(message);
-    }
-
-    /// Log an error message
-    pub fn error(&mut self, message: impl Into<String>) {
-        self.logger.error(message);
-    }
-
-    /// Prints the radar data to the terminal
-    pub fn print_radar(&mut self, update: &ServerUpdate) {
-        self.logger.info(format!(
-            "Radar for Bot {} (Tick {}):\n{}",
-            self.bot_id,
-            update.tick,
-            format_radar(&update.radar)
-        ));
-    }
+/// Check if a year is a leap year
+fn is_leap_year(year: u64) -> bool {
+    (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)
 }
-
 
 /// Formats radar data as a string instead of printing directly
 pub fn format_radar(radar: &RadarData) -> String {

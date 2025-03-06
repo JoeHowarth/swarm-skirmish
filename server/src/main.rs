@@ -14,7 +14,7 @@ use std::{
     time::Duration,
 };
 
-use actions::{ActionsPlugin, ActionsSystemSet};
+use apply_actions::{ActionsPlugin, ActionsSystemSet};
 use argh::{FromArgValue, FromArgs};
 use bevy::{
     prelude::*,
@@ -26,17 +26,10 @@ use bot_update::{BotId, BotUpdatePlugin, BotUpdateSystemSet};
 use levels::{Levels, LevelsDiscriminants, LevelsPlugin};
 use serde::{Deserialize, Serialize};
 use strum::IntoDiscriminant;
-use swarm_lib::{
-    bot_harness::Bot,
-    ctx::{BotLogger, Ctx},
-    Energy,
-    Item,
-    Pos,
-    Team,
-};
+use swarm_lib::{bot_logger::BotLogger, Bot, Energy, Item, Pos, Team};
 use tilemap::TilemapSystemSimUpdateSet;
 
-mod actions;
+mod apply_actions;
 mod bot_update;
 mod core;
 mod levels;
@@ -73,7 +66,6 @@ use dlopen2::wrapper::{Container, WrapperApi};
 
 fn main() {
     let args: Args = argh::from_env();
-
 
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {

@@ -1,23 +1,20 @@
-use rand::{
-    rngs::SmallRng,
-    Rng,
-    SeedableRng,
-};
+use rand::{rngs::SmallRng, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use swarm_lib::{
-    bot_harness::{Bot, OldBot},
-    ctx::BotLogger,
+    bot_logger::BotLogger,
     gridworld::{GridWorld, PassableCell},
     Action,
     ActionStatusDiscriminants,
-    BotResponse,
+    Bot,
+    BotResp,
+    BotUpdate,
     CellKind,
     CellStateRadar,
     Dir,
     Item::{self, *},
+    NewBotNoMangeFn,
     Pos,
     RadarData,
-    ServerUpdate,
     Team,
 };
 
@@ -37,6 +34,9 @@ pub fn new_bot(ctx: BotLogger, (map_w, map_h): (usize, usize)) -> Box<dyn Bot> {
         seen_bots: Vec::new(),
     })
 }
+
+/// Type check
+static _X: NewBotNoMangeFn = new_bot;
 
 pub struct CrumbFollower {
     ctx: BotLogger,
@@ -152,7 +152,7 @@ impl CrumbFollower {
 }
 
 impl Bot for CrumbFollower {
-    fn update(&mut self, update: ServerUpdate) -> Option<BotResponse> {
+    fn update(&mut self, update: BotUpdate) -> Option<BotResp> {
         update_known_map(
             &mut self.grid,
             &mut self.seen_bots,
@@ -179,7 +179,7 @@ impl Bot for CrumbFollower {
         // Build and send response with movement action
         self.action_counter += 1;
         Some(
-            BotResponse::builder()
+            BotResp::builder()
                 .push_action_id(action, self.action_counter)
                 .build(),
         )

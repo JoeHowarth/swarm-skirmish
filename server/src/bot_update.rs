@@ -1,21 +1,20 @@
 use bevy::{prelude::*, utils::HashMap};
 use dlopen2::wrapper::{Container, WrapperApi};
 use swarm_lib::{
-    bot_harness::Bot,
-    ctx::BotLogger,
+    bot_logger::BotLogger,
+    Bot,
     CellKind,
     CellStateRadar,
     Energy,
     Pos,
     RadarBotData,
     RadarData,
-    ServerUpdate,
-    ServerUpdateEnvelope,
+    BotUpdate,
     Team,
 };
 
 use crate::{
-    actions::{ActionQueue, ComputedActionQueue, InProgressAction},
+    apply_actions::{ActionQueue, ComputedActionQueue, InProgressAction},
     core::{Inventory, PawnKind, SGridWorld as GridWorld, Tick},
 };
 
@@ -92,7 +91,7 @@ fn ensure_bot_id(
 }
 
 fn update_bots(
-    mut updates: In<HashMap<BotId, ServerUpdate>>,
+    mut updates: In<HashMap<BotId, BotUpdate>>,
     mut query: Query<(Entity, &BotId, &mut ActionQueue, &mut BotInstance)>,
 ) {
     for (entity, bot_id, mut action_queue, mut bot_instance) in query.iter_mut()
@@ -122,14 +121,14 @@ pub fn create_server_updates<'a>(
     tick: Res<Tick>,
     query: Query<(&BotId, &Pos, &Team, &InProgressAction, &Inventory, &Energy)>,
     grid_world: Res<GridWorld>,
-) -> HashMap<BotId, ServerUpdate> {
+) -> HashMap<BotId, BotUpdate> {
     query
         .iter()
         .map(
             |(bot_id, pos, team, in_progress_action, inventory, energy)| {
                 (
                     *bot_id,
-                    ServerUpdate {
+                    BotUpdate {
                         tick: tick.0,
                         team: *team,
                         position: *pos,

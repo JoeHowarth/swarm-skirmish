@@ -3,11 +3,11 @@ use std::collections::VecDeque;
 use bevy::prelude::*;
 use swarm_lib::{
     Action,
-    ActionEnvelope,
     ActionId,
     ActionResult,
     ActionStatus,
     ActionStatusDiscriminants,
+    ActionWithId,
     Dir,
     Energy,
     Team,
@@ -21,7 +21,7 @@ use crate::{
 
 /// High-level action queue with actions sent in from bots
 #[derive(Component, Default, Deref, DerefMut)]
-pub struct ActionQueue(VecDeque<ActionEnvelope>);
+pub struct ActionQueue(VecDeque<ActionWithId>);
 
 /// Expanded sub-actions tied to a specific high-level action
 #[derive(Component, Default, Deref, DerefMut)]
@@ -123,7 +123,7 @@ fn handle_bot_actions(
         }
         assert!(in_progress.opt.is_none());
 
-        let Some(ActionEnvelope { action, id }) = incoming.pop_front() else {
+        let Some(ActionWithId { action, id }) = incoming.pop_front() else {
             trace!(?bot_id, "No actions in queue");
             continue;
         };

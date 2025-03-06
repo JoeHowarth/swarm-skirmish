@@ -186,12 +186,12 @@ fn init_random_crumbs_and_truffles(
 
     // Generate 5 sets of contiguous wall segments
     for _ in 0..5 {
-        let segment_length = rng.gen_range(2..=20);
-        let start_x = rng.gen_range(2..width - 2);
-        let start_y = rng.gen_range(2..height - 2);
+        let segment_length = rng.random_range(2..=20);
+        let start_x = rng.random_range(2..width - 2);
+        let start_y = rng.random_range(2..height - 2);
 
         // Choose a random direction: 0=right, 1=down, 2=left, 3=up
-        let direction = rng.gen_range(0..4);
+        let direction = rng.random_range(0..4);
 
         for i in 0..segment_length {
             let (wall_x, wall_y) = match direction {

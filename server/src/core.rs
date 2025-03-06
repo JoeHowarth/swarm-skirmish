@@ -3,7 +3,11 @@ use std::fmt::Write;
 use bevy::{prelude::*, utils::HashMap};
 use strum_macros::Display;
 use swarm_lib::{
-    gridworld::{GridWorld, PassableCell}, CellKind, Energy, Item, Pos
+    gridworld::{GridWorld, PassableCell},
+    CellKind,
+    Energy,
+    Item,
+    Pos,
 };
 
 use crate::bot_update::BotId;
@@ -31,7 +35,6 @@ pub struct Tick(pub u32);
 pub enum PawnKind {
     #[default]
     Basic,
-    FindBot,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -64,6 +67,7 @@ impl CellState {
         }
     }
 
+    #[allow(dead_code)]
     pub fn new_with_item(item: Item) -> CellState {
         CellState {
             kind: CellKind::Empty,
