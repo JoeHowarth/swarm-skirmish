@@ -1,13 +1,10 @@
 use std::{
     collections::HashMap,
-    fs::{File, OpenOptions},
-    io::{BufReader, BufWriter, Write},
+    io::{BufReader, BufWriter},
     net::TcpStream,
-    path::PathBuf,
-    process::exit,
     sync::{
         atomic::{AtomicBool, Ordering},
-        mpsc::{self, Receiver, Sender},
+        mpsc::{self, Sender},
         Arc,
         Mutex,
     },
@@ -15,23 +12,17 @@ use std::{
     time::Duration,
 };
 
-use bevy_utils::tracing::trace;
-use chrono::Local;
 use eyre::Result;
 use once_cell::sync::Lazy;
 
 use crate::{
     ctx::Ctx,
     protocol::Protocol,
-    BotMsgEnvelope,
     BotResponse,
-    CellKind,
     ClientMsg,
-    RadarData,
     ServerMsg,
     ServerUpdate,
     ServerUpdateEnvelope,
-    Team,
 };
 
 /// Global map size, initialized when ConnectAck is received

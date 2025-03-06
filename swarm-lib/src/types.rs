@@ -1,10 +1,8 @@
 use bevy_ecs::component::Component;
-use bevy_math::{IVec2, UVec2};
-use rand::Rng;
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
-use crate::{Action, ActionEnvelope, ActionId, BotResponse, Dir, Team};
+use crate::{Action, ActionEnvelope, Dir, Team};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RadarBotData {

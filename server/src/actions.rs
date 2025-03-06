@@ -274,7 +274,7 @@ fn process_computed_action(
             continue;
         }
 
-        if (computed_queue.is_empty()) {
+        if computed_queue.is_empty() {
             in_progress.status = ActionStatus::Success;
             continue;
         }

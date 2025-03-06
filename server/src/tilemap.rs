@@ -267,7 +267,7 @@ impl TilemapWorldCoords {
 /// values
 fn update_tilemap_world_coords(
     tilemap: Query<(&Transform, &TilemapGridSize, &TilemapType)>,
-    mut coords: Option<ResMut<TilemapWorldCoords>>,
+    coords: Option<ResMut<TilemapWorldCoords>>,
 ) {
     let Some(mut coords) = coords else {
         return;

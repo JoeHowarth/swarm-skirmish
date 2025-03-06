@@ -1,17 +1,14 @@
-use eyre::Result;
 use rand::{
-    rngs::{SmallRng, ThreadRng},
+    rngs::SmallRng,
     Rng,
     SeedableRng,
 };
 use serde::{Deserialize, Serialize};
 use swarm_lib::{
-    bevy_math::UVec2,
-    bot_harness::{map_size, Bot, OldBot},
-    ctx::{BotLogger, Ctx},
+    bot_harness::{Bot, OldBot},
+    ctx::BotLogger,
     gridworld::{GridWorld, PassableCell},
     Action,
-    ActionStatus,
     ActionStatusDiscriminants,
     BotResponse,
     CellKind,

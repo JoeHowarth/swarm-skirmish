@@ -1,33 +1,23 @@
 use std::{
     collections::HashMap,
     fs::{File, OpenOptions},
-    io::{BufReader, BufWriter, Write},
-    net::TcpStream,
+    io::Write,
     path::PathBuf,
-    process::exit,
     sync::{
         atomic::{AtomicBool, Ordering},
-        mpsc::{self, Receiver, Sender},
+        mpsc::{Receiver, Sender},
         Arc,
-        Mutex,
     },
-    thread::sleep,
     time::Duration,
 };
 
-use bevy_utils::tracing::trace;
 use chrono::Local;
-use eyre::Result;
-use once_cell::sync::Lazy;
 
 use crate::{
-    protocol::Protocol,
     BotMsgEnvelope,
     BotResponse,
     CellKind,
-    ClientMsg,
     RadarData,
-    ServerMsg,
     ServerUpdate,
     ServerUpdateEnvelope,
     Team,
