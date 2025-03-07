@@ -2,6 +2,10 @@ use bevy::{prelude::*, utils::HashMap};
 use dlopen2::wrapper::{Container, WrapperApi};
 use swarm_lib::{
     bot_logger::BotLogger,
+    Action,
+    ActionResult,
+    ActionStatus,
+    ActionWithId,
     Bot,
     BotUpdate,
     CellKind,
@@ -14,7 +18,7 @@ use swarm_lib::{
 };
 
 use crate::{
-    apply_actions::{ActionQueue, ComputedActionQueue, InProgressAction},
+    apply_actions::{ActionContainer, ActionState, CurrentAction, PastActions},
     types::{GridWorld, Inventory, PawnKind, Tick},
 };
 
@@ -28,7 +32,7 @@ struct Api {
 struct BotLib(pub Container<Api>);
 
 #[derive(Component, Debug, Clone, Copy, Hash, PartialEq, Eq)]
-#[require(ActionQueue, InProgressAction, ComputedActionQueue)]
+#[require(CurrentAction, PastActions)]
 pub struct BotId(pub u32);
 
 pub struct BotUpdatePlugin;
@@ -92,40 +96,85 @@ fn ensure_bot_id(
 
 fn update_bots(
     mut updates: In<HashMap<BotId, BotUpdate>>,
-    mut query: Query<(Entity, &BotId, &mut ActionQueue, &mut BotInstance)>,
+    mut query: Query<(
+        Entity,
+        &BotId,
+        &mut CurrentAction,
+        &mut PastActions,
+        &mut BotInstance,
+    )>,
 ) {
-    for (entity, bot_id, mut action_queue, mut bot_instance) in query.iter_mut()
+    for (
+        entity,
+        bot_id,
+        mut current_action,
+        mut past_actions,
+        mut bot_instance,
+    ) in query.iter_mut()
     {
         debug!(?bot_id, entity = entity.index(), "Updating bot");
         let server_update = updates.remove(bot_id).unwrap();
 
-        let Some(response) = bot_instance.bot.update(server_update.clone())
-        else {
-            debug!("No response from bot ID: {}", bot_id.0);
+        let maybe_action = bot_instance.bot.update(server_update.clone());
+
+        let Some(action) = maybe_action else {
+            debug!("No action from bot ID: {}", bot_id.0);
             continue;
         };
 
-        debug!(
-            "Bot ID: {} returned {} actions",
-            bot_id.0,
-            response.actions.len()
-        );
-        for action in response.actions {
-            trace!("Bot ID: {} action: {:?}", bot_id.0, action);
-            action_queue.push_back(action);
+        trace!("Bot ID: {} action: {:?}", bot_id.0, action);
+        let action_container = ActionContainer {
+            state: match &action.action {
+                Action::MoveTo(path) => ActionState::MoveTo {
+                    path: path.iter().skip(1).cloned().collect(),
+                },
+                Action::Noop => ActionState::None,
+                Action::MoveDir(_) => ActionState::None,
+                Action::Harvest(_) => ActionState::Harvest { remaining: 1 },
+            },
+            kind: action.action,
+            id: action.id,
+        };
+
+        // If there is a current action already, cancel it
+        if let Some(action) =
+            std::mem::replace(&mut current_action.0, Some(action_container))
+        {
+            past_actions.push(ActionResult {
+                action: action.kind,
+                id: action.id,
+                status: ActionStatus::Cancelled,
+                completed_tick: server_update.tick,
+            });
         }
     }
 }
 
 pub fn create_server_updates<'a>(
     tick: Res<Tick>,
-    query: Query<(&BotId, &Pos, &Team, &InProgressAction, &Inventory, &Energy)>,
+    query: Query<(
+        &BotId,
+        &Pos,
+        &Team,
+        &CurrentAction,
+        &PastActions,
+        &Inventory,
+        &Energy,
+    )>,
     grid_world: Res<GridWorld>,
 ) -> HashMap<BotId, BotUpdate> {
     query
         .iter()
         .map(
-            |(bot_id, pos, team, in_progress_action, inventory, energy)| {
+            |(
+                bot_id,
+                pos,
+                team,
+                current_action,
+                past_actions,
+                inventory,
+                energy,
+            )| {
                 (
                     *bot_id,
                     BotUpdate {
@@ -133,7 +182,28 @@ pub fn create_server_updates<'a>(
                         team: *team,
                         position: *pos,
                         radar: create_radar_data(pos, &grid_world, &query),
-                        action_result: in_progress_action.opt.clone(),
+                        in_progress_action: {
+                            current_action.as_ref().map(|action_container| {
+                                ActionWithId {
+                                    action: action_container.kind.clone(),
+                                    id: action_container.id,
+                                }
+                            })
+                        },
+                        completed_action: {
+                            past_actions.last().and_then(|action| {
+                                if action.completed_tick == tick.0 {
+                                    Some(ActionResult {
+                                        action: action.action.clone(),
+                                        status: action.status.clone(),
+                                        id: action.id,
+                                        completed_tick: tick.0,
+                                    })
+                                } else {
+                                    None
+                                }
+                            })
+                        },
                         items: inventory.0.clone(),
                         energy: *energy,
                     },
@@ -150,7 +220,8 @@ fn create_radar_data(
         &BotId,
         &Pos,
         &Team,
-        &InProgressAction,
+        &CurrentAction,
+        &PastActions,
         &Inventory,
         &Energy,
     )>,
@@ -181,7 +252,7 @@ fn create_radar_data(
                     CellKind::Unknown => unreachable!(),
                 },
                 pawn: cell.pawn.map(|e| {
-                    let (bot_id, _, &team, _, _, _) = query.get(e).unwrap();
+                    let (bot_id, _, &team, _, _, _, _) = query.get(e).unwrap();
 
                     // Store the bot's position in world coordinates
                     radar.pawns.push(RadarBotData {

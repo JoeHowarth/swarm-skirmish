@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 
 use bevy::prelude::*;
+use strum::IntoEnumIterator;
 use swarm_lib::{
     Action,
     ActionId,
@@ -10,6 +11,7 @@ use swarm_lib::{
     ActionWithId,
     Dir,
     Energy,
+    Item,
     Team,
 };
 
@@ -21,39 +23,25 @@ use crate::{
 
 /// High-level action queue with actions sent in from bots
 #[derive(Component, Default, Deref, DerefMut)]
-pub struct ActionQueue(VecDeque<ActionWithId>);
+pub struct CurrentAction(pub Option<ActionContainer>);
 
-/// Expanded sub-actions tied to a specific high-level action
+/// Past actions that have been applied
 #[derive(Component, Default, Deref, DerefMut)]
-pub struct ComputedActionQueue(pub VecDeque<ComputedAction>);
+pub struct PastActions(pub Vec<ActionResult>);
 
-/// Track which high-level action is currently in progress, if any
-#[derive(Component, Default, Debug)]
-pub struct InProgressAction {
-    pub opt: Option<ActionResult>,
+#[derive(Component, Debug)]
+pub struct ActionContainer {
+    pub kind: Action,
+    pub id: ActionId,
+    pub state: ActionState,
 }
 
-/// A decomposed sub-action, preserving the parent action’s ID
-#[derive(Debug, Clone)]
-pub struct ComputedAction {
-    pub parent_id: u32,
-    pub kind: ComputedActionKind,
-}
-
-#[derive(Debug, Clone)]
-pub enum ComputedActionKind {
-    MoveDir(Dir),
-    Harvest(Dir),
-}
-
-impl ComputedAction {
-    pub fn energy(&self) -> Energy {
-        match self.kind {
-            ComputedActionKind::MoveDir(d) => Action::MoveDir(d).energy(),
-            ComputedActionKind::Harvest(d) => Action::Harvest(d).energy(),
-        }
-        .unwrap()
-    }
+#[derive(Debug)]
+pub enum ActionState {
+    None,
+    MoveTo { path: VecDeque<Pos> },
+    Harvest { remaining: u32 },
+    Transfer { remaining: u32 },
 }
 
 pub struct ActionsPlugin;
@@ -65,157 +53,146 @@ impl Plugin for ActionsPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
-            (
-                // handle_incoming_bot_actions,
-                handle_bot_actions,
-                process_computed_action,
-            )
+            (validate_actions, apply_actions)
                 .chain()
                 .in_set(ActionsSystemSet),
         );
     }
 }
 
-// fn handle_incoming_bot_actions(
-//     tick: Res<Tick>,
-//     action_recv: Res<ActionRecv>,
-//     mut queues: Query<&mut ActionQueue>,
-//     bot_id_to_entity: Res<BotIdToEntity>,
-// ) {
-//     while let Ok((bot_id, sent_tick, action)) = action_recv.0.try_recv() {
-//         let entity = bot_id_to_entity.0.get(&bot_id).unwrap();
-//         debug!(
-//             bot_id = bot_id.0,
-//             ?action,
-//             entity = entity.index(),
-//             sim_tick = tick.0,
-//             sent_tick,
-//             "Received bot action"
-//         );
-//         queues.get_mut(*entity).unwrap().0.push_back(action);
-//     }
-// }
-
-fn handle_bot_actions(
+fn validate_actions(
+    tick: Res<Tick>,
     mut query: Query<(
         &BotId,
         &Pos,
-        &mut ActionQueue,
-        &mut InProgressAction,
-        &mut ComputedActionQueue,
+        &Energy,
+        &mut CurrentAction,
+        &mut PastActions,
     )>,
     grid_world: Res<GridWorld>,
 ) {
-    for (bot_id, pos, mut incoming, mut in_progress, mut computed) in
+    for (bot_id, pos, energy, mut current_action, mut past_actions) in
         query.iter_mut()
     {
-        dbg!(&in_progress);
-        if let Some(result) = std::mem::take(&mut in_progress.opt) {
-            if ActionStatusDiscriminants::InProgress == (&result.status).into()
-            {
-                trace!(
-                    ?bot_id,
-                    "InProgressAction found, skipping until complete"
-                );
-                in_progress.opt = Some(result);
-                continue;
-            }
-        }
-        assert!(in_progress.opt.is_none());
-
-        let Some(ActionWithId { action, id }) = incoming.pop_front() else {
-            trace!(?bot_id, "No actions in queue");
+        let Some(ActionContainer { kind, state, id }) = &current_action.0
+        else {
+            // No actions to process, skip
             continue;
         };
-        debug!(?bot_id, ?action, "Processing action");
 
-        match action {
-            Action::MoveDir(dir) => {
-                debug!(?bot_id, ?dir, "Moving in direction");
-                // move_events.send(MoveEvent { entity, dir });
+        let Some(status) =
+            is_action_invalid(pos, energy, kind, state, &grid_world)
+        else {
+            // Action is valid, proceed
+            continue;
+        };
 
-                computed.push_back(ComputedAction {
-                    parent_id: id,
-                    kind: ComputedActionKind::MoveDir(dir),
-                })
-            }
-            Action::Harvest(dir) => {
-                debug!(?bot_id, ?dir, "Harvesting in direction");
+        // Action is invalid, remove from queue and set status
+        warn!(?bot_id, action = ?kind, ?id, ?status, "Invalid action");
+        let ActionContainer { kind, id, .. } =
+            std::mem::replace(&mut current_action.0, None).unwrap();
 
-                computed.push_back(ComputedAction {
-                    parent_id: id,
-                    kind: ComputedActionKind::Harvest(dir),
-                })
-            }
-            Action::MoveTo(goal) => {
-                if goal == *pos {
-                    debug!(?bot_id, ?goal, "Already at goal position");
-                    in_progress.opt = Some(ActionResult {
-                        action,
-                        id,
-                        status: ActionStatus::Success,
-                    });
-                    continue;
-                }
-
-                debug!(?bot_id, ?pos, ?goal, "Finding path to goal");
-                let Some(path) = grid_world.find_path(*pos, goal) else {
-                    warn!(?goal, ?bot_id, "Invalid goal");
-                    in_progress.opt = Some(ActionResult {
-                        action,
-                        id,
-                        status: ActionStatus::Failure("Invalid goal".into()),
-                    });
-                    continue;
-                };
-
-                trace!(?bot_id, ?path, "Path found");
-
-                debug!(
-                    ?bot_id,
-                    actions_count = path.len().saturating_sub(1),
-                    "Adding path actions to queue"
-                );
-
-                for window in path.windows(2) {
-                    let current = window[0];
-                    let next = window[1];
-                    let diff = next - current;
-
-                    let Some(dir) = Dir::from_deltas(diff) else {
-                        panic!(
-                            "Invalid path step from {:?} to {:?}",
-                            current, next
-                        );
-                    };
-                    trace!(?current, ?next, ?dir, "Path step");
-
-                    computed.push_back(ComputedAction {
-                        parent_id: id,
-                        kind: ComputedActionKind::MoveDir(dir),
-                    });
-                }
-            }
-        }
-
-        in_progress.opt = Some(ActionResult {
-            action,
+        past_actions.push(ActionResult {
+            action: kind,
             id,
-            status: ActionStatus::InProgress {
-                progress: 0,
-                total: computed.len() as u16,
-            },
+            status: ActionStatus::Failure(status),
+            completed_tick: tick.0,
         });
     }
 }
 
-fn process_computed_action(
+fn is_action_invalid(
+    pos: &Pos,
+    energy: &Energy,
+    kind: &Action,
+    state: &ActionState,
+    grid_world: &GridWorld,
+) -> Option<String> {
+    if *energy < kind.energy_per_tick() {
+        return Some("Insufficient Energy".into());
+    }
+
+    match kind {
+        Action::MoveDir(dir) => {
+            let Some(new_pos) = *pos + *dir else {
+                return Some("Invalid Move: Invalid direction".into());
+            };
+
+            if !grid_world.in_bounds(&new_pos) {
+                return Some("Invalid Move: Out of bounds".into());
+            }
+
+            let cell = grid_world.get_pos(new_pos);
+            if !cell.can_enter() {
+                return Some("Invalid Move: Cannot enter cell".into());
+            }
+        }
+        Action::MoveTo(path) => {
+            if path.is_empty() {
+                return Some("Invalid Move: Empty path".into());
+            }
+
+            let ActionState::MoveTo { path } = state else {
+                return Some("Invalid Move: Not a move to action".into());
+            };
+
+            if path.is_empty() {
+                return Some("Invalid Move: Empty path".into());
+            }
+
+            let new_pos = path.front().unwrap();
+            if !grid_world.in_bounds(&new_pos) {
+                return Some("Invalid Move: New pos out of bounds".into());
+            }
+
+            let cell = grid_world.get_pos(*new_pos);
+            if !cell.can_enter() {
+                return Some("Invalid Move: Cannot enter new pos".into());
+            }
+
+            // Check if new_pos is adjacent to current pos
+            let is_adjacent = Dir::iter().any(|dir| {
+                if let Some(adjacent_pos) = *pos + dir {
+                    adjacent_pos == *new_pos
+                } else {
+                    false
+                }
+            });
+
+            if !is_adjacent {
+                return Some(
+                    "Invalid Move: Next position must be adjacent".into(),
+                );
+            }
+        }
+        Action::Harvest(dir) => {
+            let Some(target_pos) = *pos + *dir else {
+                return Some("Invalid Harvest: Invalid direction".into());
+            };
+
+            if !grid_world.in_bounds(&target_pos) {
+                return Some("Invalid Harvest: Out of bounds".into());
+            }
+
+            let cell = grid_world.get_pos(target_pos);
+            if cell.item != Some(Item::Truffle) {
+                return Some("Invalid Harvest: No truffle".into());
+            }
+        }
+        Action::Noop => {}
+    }
+
+    None
+}
+
+fn apply_actions(
+    tick: Res<Tick>,
     mut query: Query<(
         Entity,
         &BotId,
         &mut Pos,
-        &mut InProgressAction,
-        &mut ComputedActionQueue,
+        &mut CurrentAction,
+        &mut PastActions,
         &mut Inventory,
         &mut Energy,
     )>,
@@ -223,134 +200,80 @@ fn process_computed_action(
 ) {
     for (
         entity,
-        _id,
+        bot_id,
         mut pos,
-        mut in_progress,
-        mut computed_queue,
+        mut current_action,
+        mut past_actions,
         mut inventory,
         mut energy,
     ) in query.iter_mut()
     {
-        let Some(in_progress) = in_progress.opt.as_mut() else {
-            assert!(
-                computed_queue.is_empty(),
-                "No InProgressAction but computed action queue not empty"
-            );
+        // Present action is valid and can be applied without checks
+        let Some(ActionContainer { kind, state, id }) = &mut current_action.0
+        else {
             continue;
         };
 
-        if computed_queue.is_empty() {
-            continue;
-        }
+        // Decrease energy
+        *energy = (*energy - kind.energy_per_tick()).unwrap();
 
-        let computed = computed_queue.pop_front().unwrap();
-        assert_eq!(
-            computed.parent_id, in_progress.id,
-            "computed.parent_id != in_progress.id"
-        );
-
-        if let Some(new_energy) = *energy - computed.energy() {
-            *energy = new_energy;
-        } else {
-            in_progress.status = ActionStatus::Failure(format!(
-                "Insufficient energy for action {computed:?}. Has {}, Cost {}",
-                *energy,
-                computed.energy(),
-            ));
-            computed_queue.clear();
-            continue;
-        }
-
-        if let Err(reason) = match computed.kind {
-            ComputedActionKind::MoveDir(dir) => {
-                handle_movement(entity, dir, &mut pos, &mut grid_world)
+        let status = match &kind {
+            Action::MoveDir(dir) => {
+                grid_world.get_pos_mut(*pos).pawn = None;
+                *pos = (*pos + *dir).unwrap();
+                grid_world.get_pos_mut(*pos).pawn = Some(entity);
+                Some(ActionStatus::Success)
             }
-            ComputedActionKind::Harvest(dir) => {
-                handle_harvest(dir, &pos, &mut grid_world, &mut inventory)
+            Action::Harvest(dir) => {
+                let target_pos = *pos + *dir;
+                grid_world.get_pos_mut(target_pos.unwrap()).item = None;
+                *inventory.0.entry(Item::Truffle).or_default() += 1;
+                Some(ActionStatus::Success)
             }
-        } {
-            in_progress.status = ActionStatus::Failure(reason);
-            computed_queue.clear();
-            continue;
-        }
+            Action::MoveTo(_) => {
+                if let ActionState::MoveTo { path } = state {
+                    apply_move_to(entity, &mut pos, path, &mut grid_world)
+                } else {
+                    Some(ActionStatus::Failure(
+                        "Invalid Move: Not a move to action".into(),
+                    ))
+                }
+            }
+            Action::Noop => Some(ActionStatus::Success),
+        };
 
-        if computed_queue.is_empty() {
-            in_progress.status = ActionStatus::Success;
+        let Some(status) = status else {
+            debug!(?bot_id, action = ?kind, ?id, ?state, "Action in progress");
+            // Action is still in progress, skip
             continue;
-        }
+        };
 
-        if let ActionStatus::InProgress { progress, .. } =
-            &mut in_progress.status
-        {
-            *progress += 1;
-        } else {
-            in_progress.status = ActionStatus::InProgress {
-                progress: 1,
-                total: computed_queue.len() as u16,
-            };
-        }
+        let ActionContainer { kind, id, .. } =
+            std::mem::replace(&mut current_action.0, None).unwrap();
+
+        info!(?bot_id, action = ?kind, ?id, ?status, "Applied action");
+        past_actions.push(ActionResult {
+            action: kind,
+            id,
+            status,
+            completed_tick: tick.0,
+        });
     }
 }
 
-fn handle_movement(
+fn apply_move_to(
     entity: Entity,
-    dir: Dir,
     pos: &mut Pos,
-    grid_world: &mut ResMut<GridWorld>,
-) -> Result<(), String> {
-    // Compute new position and bounds check
-    let new_pos = *pos + dir.to_deltas();
-    if !grid_world.in_bounds_i(new_pos) {
-        warn!(?new_pos, pos = %*pos, "Movement out of bounds");
-        return Err("Movement out of Bounds".into());
-    }
-
-    // Ensure we pawn can enter new position
-    let new_pos = Pos::from(new_pos);
-    if !grid_world.get_pos(new_pos).can_enter() {
-        warn!(?new_pos, pos = %*pos, "Cannot enter cell");
-        return Err("Cannot enter cell".into());
-    }
-
-    // Update cells
+    path: &mut VecDeque<Pos>,
+    grid_world: &mut GridWorld,
+) -> Option<ActionStatus> {
     grid_world.get_pos_mut(*pos).pawn = None;
-    grid_world.get_pos_mut(new_pos).pawn = Some(entity);
+    *pos = path.pop_front().unwrap();
+    grid_world.get_pos_mut(*pos).pawn = Some(entity);
 
-    // Set position to new position
-    *pos = new_pos;
-
-    Ok(())
-}
-
-fn handle_harvest(
-    dir: Dir,
-    pos: &Pos,
-    grid_world: &mut ResMut<GridWorld>,
-    inventory: &mut Inventory,
-) -> Result<(), String> {
-    use swarm_lib::Item;
-
-    // Calculate the target position to harvest from
-    let target_pos = *pos + dir.to_deltas();
-    if !grid_world.in_bounds_i(target_pos) {
-        warn!(?target_pos, pos = %*pos, "Harvest target out of bounds");
-        return Err("Harvest target out of bounds".into());
+    if path.is_empty() {
+        Some(ActionStatus::Success)
+    } else {
+        None
     }
-
-    let target_pos = Pos::from(target_pos);
-    let cell = grid_world.get_pos(target_pos);
-
-    // Check if the target cell has a truffle
-    if cell.item != Some(Item::Truffle) {
-        warn!(?target_pos, pos = %*pos, "No truffle to harvest at target position");
-        return Err("No truffle to harvest at target position".into());
-    }
-
-    // Perform the harvest by marking the cell as no longer having a truffle
-    // The actual item pickup happens in the harvest_truffles system in core.rs
-    grid_world.get_pos_mut(target_pos).item = None;
-    info!(pos = %*pos, target = %target_pos, "Harvested truffle");
-    *inventory.0.entry(Item::Truffle).or_default() += 1;
-
-    Ok(())
 }

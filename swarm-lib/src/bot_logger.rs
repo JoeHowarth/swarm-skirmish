@@ -6,7 +6,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use crate::{CellKind, RadarData, Team};
+use crate::{BotUpdate, CellKind, RadarData, Team};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LogLevel {
@@ -167,7 +167,7 @@ impl BotLogger {
     }
 
     /// Flush all buffered logs to stdout with appropriate headers
-    fn flush_buffer_to_stdout(&mut self) {
+    pub fn flush_buffer_to_stdout(&mut self) {
         if self.buffer.is_empty() {
             return;
         }
@@ -211,6 +211,42 @@ impl BotLogger {
 
         // Clear the buffer
         self.buffer.clear();
+    }
+
+    pub fn log_debug_info(
+        &mut self,
+        update: &BotUpdate,
+        log_every_x_ticks: u32,
+    ) {
+        self.debug(format!("Processing tick {}", update.tick));
+
+        if update.tick % log_every_x_ticks == 0 {
+            // Format items as a readable list
+            let items_str = if update.items.is_empty() {
+                "None".to_string()
+            } else {
+                update
+                    .items
+                    .iter()
+                    .map(|(item, count)| format!("{}: {}", item, count))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            };
+
+            self.debug(format!(
+                "Bot Status Report [Tick {}]:\n{}\nEnergy: {}\nDetected Bots: \
+                 {}\nItems: {}\nTeam: {:?}",
+                update.tick,
+                update.position,
+                update.energy.0,
+                update.radar.pawns.len(),
+                items_str,
+                update.team
+            ));
+
+            // The print_radar method now logs internally
+            print_radar(&update.radar);
+        }
     }
 }
 

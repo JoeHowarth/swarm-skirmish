@@ -3,7 +3,7 @@ use bevy_ecs::system::Resource;
 
 use crate::Pos;
 
-#[derive(Resource)]
+#[derive(Resource, Debug)]
 pub struct GridWorld<CellState> {
     pub grid: Array2D<CellState>,
 }
@@ -167,6 +167,8 @@ impl PathFinder {
         };
         let start = start.into().0;
         let goal = goal.into().0;
+
+        dbg!(&start, &goal);
 
         #[derive(Eq, PartialEq)]
         struct Node {

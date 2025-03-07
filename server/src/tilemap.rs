@@ -6,13 +6,10 @@ use bevy::{
 };
 use bevy_ecs_tilemap::prelude::*;
 use image::DynamicImage;
-use swarm_lib::{CellKind, Item, Pos, Team};
+use swarm_lib::{Action::*, CellKind, Item, Pos, Team};
 
 use crate::{
-    apply_actions::{
-        ComputedActionKind::{Harvest, MoveDir},
-        ComputedActionQueue,
-    },
+    apply_actions::{ActionContainer, ActionState, CurrentAction},
     get_map_size,
     types::{CellState, GridWorld},
     GameState,
@@ -61,31 +58,32 @@ impl Plugin for TilemapPlugin {
 
 fn render_move_to(
     mut gizmos: Gizmos,
-    actions: Query<(&Pos, &ComputedActionQueue)>,
+    actions: Query<(&Pos, &CurrentAction)>,
     tilemap_coords: Option<Res<TilemapWorldCoords>>,
 ) {
     let Some(tilemap_coords) = tilemap_coords else {
         return;
     };
 
-    for (pos, computed_action) in actions.iter() {
-        let mut pos = *pos;
-        for action in &computed_action.0 {
-            match action.kind {
-                MoveDir(dir) => {
-                    let Some(dst) = pos + dir else {
-                        continue;
-                    };
+    for (pos, current_action) in actions.iter() {
+        let Some(ActionContainer { state, .. }) = &current_action.0 else {
+            continue;
+        };
 
+        match state {
+            ActionState::MoveTo { path } => {
+                let mut pos = *pos;
+
+                for dst in path {
                     let src_world = tilemap_coords.pos_to_world(&pos);
-                    let dst_world = tilemap_coords.pos_to_world(&dst);
+                    let dst_world = tilemap_coords.pos_to_world(dst);
 
                     gizmos.line_2d(src_world, dst_world, css::RED);
 
-                    pos = dst;
+                    pos = *dst;
                 }
-                Harvest(_) => continue,
             }
+            _ => {}
         }
     }
 }

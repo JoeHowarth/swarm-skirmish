@@ -1,7 +1,7 @@
-use rand::Rng;
+
 use serde::{Deserialize, Serialize};
 
-use crate::{BotResp, Dir, Energy, Pos};
+use crate::{Dir, Energy, Pos};
 
 pub type ActionId = u32;
 
@@ -13,21 +13,31 @@ pub struct ActionWithId {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Action {
+    Noop,
     MoveDir(Dir),
-    MoveTo(Pos),
+    MoveTo(Vec<Pos>),
     Harvest(Dir),
 }
 
 impl Action {
-    pub fn energy(&self) -> Option<Energy> {
-        Some(
-            match self {
-                Action::MoveDir(_) => 1,
-                Action::MoveTo(_) => return None,
-                Action::Harvest(_) => 5,
-            }
-            .into(),
-        )
+    pub fn total_energy(&self) -> Energy {
+        match self {
+            Action::MoveDir(_) => 1,
+            Action::MoveTo(path) => path.len() as u32,
+            Action::Harvest(_) => 5,
+            Action::Noop => 0,
+        }
+        .into()
+    }
+
+    pub fn energy_per_tick(&self) -> Energy {
+        match self {
+            Action::MoveDir(_) => 1,
+            Action::MoveTo(_) => 1,
+            Action::Harvest(_) => 5,
+            Action::Noop => 0,
+        }
+        .into()
     }
 }
 
@@ -36,6 +46,7 @@ pub struct ActionResult {
     pub action: Action,
     pub id: ActionId,
     pub status: ActionStatus,
+    pub completed_tick: u32,
 }
 
 #[derive(
@@ -50,54 +61,19 @@ pub struct ActionResult {
 pub enum ActionStatus {
     Success,
     Failure(String),
-    InProgress { progress: u16, total: u16 },
+    Cancelled,
 }
 
-/// Builder for BotResponse to enable fluent method chaining
-#[derive(Debug, Clone, Default)]
-pub struct RespBuilder {
-    pub actions: Vec<ActionWithId>,
-    pub cancel_actions: Vec<ActionId>,
-    pub cancel_all_actions: bool,
-}
-
-impl RespBuilder {
-    pub fn new() -> Self {
-        Self {
-            actions: Vec::new(),
-            cancel_actions: Vec::new(),
-            cancel_all_actions: false,
-        }
+impl ActionStatus {
+    pub fn is_success(&self) -> bool {
+        matches!(self, ActionStatus::Success)
     }
 
-    pub fn push_action_id(
-        &mut self,
-        action: Action,
-        id: ActionId,
-    ) -> &mut Self {
-        self.actions.push(ActionWithId { id, action });
-        self
+    pub fn is_failure(&self) -> bool {
+        matches!(self, ActionStatus::Failure(_))
     }
 
-    pub fn push_action(&mut self, action: Action) -> &mut Self {
-        self.push_action_id(action, rand::rng().random())
-    }
-
-    pub fn cancel_action(&mut self, id: ActionId) -> &mut Self {
-        self.cancel_actions.push(id);
-        self
-    }
-
-    pub fn cancel_all_actions(&mut self) -> &mut Self {
-        self.cancel_all_actions = true;
-        self
-    }
-
-    pub fn build(&mut self) -> BotResp {
-        BotResp {
-            actions: std::mem::take(&mut self.actions),
-            cancel_actions: std::mem::take(&mut self.cancel_actions),
-            cancel_all_actions: self.cancel_all_actions,
-        }
+    pub fn is_cancelled(&self) -> bool {
+        matches!(self, ActionStatus::Cancelled)
     }
 }

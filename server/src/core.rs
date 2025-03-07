@@ -5,7 +5,7 @@ use strum_macros::Display;
 use swarm_lib::{gridworld::PassableCell, CellKind, Energy, Item, Pos};
 
 use crate::{
-    apply_actions::{ActionQueue, ComputedActionQueue, InProgressAction},
+    apply_actions::CurrentAction,
     bot_update::BotId,
     types::{GridWorld, Inventory, PawnKind, Tick},
 };

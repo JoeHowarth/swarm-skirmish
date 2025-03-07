@@ -4,9 +4,8 @@ use swarm_lib::{
     bot_logger::BotLogger,
     gridworld::{GridWorld, PassableCell},
     Action,
-    ActionStatusDiscriminants,
+    ActionWithId,
     Bot,
-    BotResp,
     BotUpdate,
     CellKind,
     CellStateRadar,
@@ -65,6 +64,7 @@ impl CrumbFollower {
     // nested conditionals
     fn determine_next_action(
         &mut self,
+        curr_pos: Pos,
         radar: &RadarData,
         tick: u32,
     ) -> Action {
@@ -73,13 +73,20 @@ impl CrumbFollower {
             self.grid.iter().find(|(_, cell)| cell.item == Some(Fent))
         {
             let pos = Pos::from((pos.0, pos.1));
-            self.ctx.debug(format!(
-                "Going to Fent at position: {}. Last observed {}, {} ticks ago",
-                pos,
-                cell.last_observed,
-                tick - cell.last_observed
-            ));
-            return Action::MoveTo(Pos::from(pos));
+
+            if let Some(path) = self.grid.find_path(curr_pos, pos) {
+                self.ctx.debug(format!(
+                    "Going to Fent at position: {}. Last observed {}, {} \
+                     ticks ago, current pos: {}",
+                    pos,
+                    cell.last_observed,
+                    tick - cell.last_observed,
+                    curr_pos
+                ));
+                return Action::MoveTo(path.into_iter().collect());
+            }
+
+            self.ctx.debug("No path to Fent");
         }
 
         // Harvest nearby Truffle
@@ -99,19 +106,30 @@ impl CrumbFollower {
             let pos = Pos::from((pos.0 + 1, pos.1));
             self.ctx.debug(format!(
                 "Going to truffle at position: {}. Last observed {}, {} ticks \
-                 ago",
+                 ago, current pos: {}",
                 pos,
                 cell.last_observed,
-                tick - cell.last_observed
+                tick - cell.last_observed,
+                curr_pos
             ));
-            return Action::MoveTo(Pos::from(pos));
+
+            if let Some(path) = self.grid.find_path(curr_pos, pos) {
+                return Action::MoveTo(path.into_iter().collect());
+            }
+
+            self.ctx.debug("No path to truffle");
         }
 
         // Follow Crumb
         if let Some((_, cell)) = radar.find(CellStateRadar::has_item(Crumb)) {
             self.ctx
                 .debug(format!("Found Crumb at world position: {}", cell.pos));
-            return Action::MoveTo(cell.pos);
+
+            if let Some(path) = self.grid.find_path(curr_pos, cell.pos) {
+                return Action::MoveTo(path.into_iter().collect());
+            }
+
+            self.ctx.debug("No path to crumb");
         }
 
         // Explore random unknown cells
@@ -129,7 +147,12 @@ impl CrumbFollower {
                 "Found random unexplored cell at position: {}",
                 Pos::from(pos)
             ));
-            return Action::MoveTo(Pos::from(pos));
+
+            if let Some(path) = self.grid.find_path(curr_pos, pos) {
+                return Action::MoveTo(path.into_iter().collect());
+            }
+
+            self.ctx.debug("No path to random unexplored cell");
         }
 
         // Random movement if nothing else to do
@@ -152,7 +175,10 @@ impl CrumbFollower {
 }
 
 impl Bot for CrumbFollower {
-    fn update(&mut self, update: BotUpdate) -> Option<BotResp> {
+    fn update(&mut self, update: BotUpdate) -> Option<ActionWithId> {
+        self.ctx.set_tick(update.tick);
+        self.ctx.log_debug_info(&update, 1);
+
         update_known_map(
             &mut self.grid,
             &mut self.seen_bots,
@@ -160,29 +186,29 @@ impl Bot for CrumbFollower {
             update.tick,
         );
 
-        let radar = &update.radar;
-        let action_result = update.action_result;
-        if let Some(result) = action_result {
-            self.ctx.debug(format!("{result:?}"));
-
-            if ActionStatusDiscriminants::InProgress == (&result.status).into()
-            {
-                self.ctx
-                    .info("Previous action still in progress, waiting...");
-                return None;
-            }
+        if let Some(action) = update.in_progress_action {
+            self.ctx.debug(format!(
+                "Previous action still in progress, waiting... Action: \
+                 {action:?}"
+            ));
+            return None;
         }
 
         // Determine the next action using a linear decision flow
-        let action = self.determine_next_action(radar, update.tick);
+        let action = self.determine_next_action(
+            update.position,
+            &update.radar,
+            update.tick,
+        );
+
+        self.ctx.flush_buffer_to_stdout();
 
         // Build and send response with movement action
         self.action_counter += 1;
-        Some(
-            BotResp::builder()
-                .push_action_id(action, self.action_counter)
-                .build(),
-        )
+        Some(ActionWithId {
+            id: self.action_counter,
+            action,
+        })
     }
 }
 

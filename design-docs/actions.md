@@ -23,7 +23,7 @@ InProgress -composed-of-> ComputedActionQueue
 
 Proposed System
 ---------------
-ActionRx -drained-> ActionQueue --> ActionResultsTx --> Sent to bot
+BotResp(s) -> ActionQueue --> ActionResults -> BotUpdate
 
 ActionQueue holds 
 ActionContainer { kind, id, state, status }
