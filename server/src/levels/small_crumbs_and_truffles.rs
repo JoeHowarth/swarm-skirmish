@@ -30,7 +30,7 @@ pub(super) fn init_small_crumbs_and_truffles(mut commands: Commands) {
             PawnKind::default(),
             Team::Player,
             Energy(100),
-            Pos((2, 2).into()),
+            Pos((2, 2)),
         ))
         .id();
 

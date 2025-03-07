@@ -339,7 +339,7 @@ mod tests {
         let path = pathfinder
             .find_path(&grid, (0, 0), (2, 2))
             .expect("Should find a path");
-        assert!(path.len() > 0); // Should find a path around the obstacle
+        assert!(!path.is_empty()); // Should find a path around the obstacle
     }
 
     #[test]

@@ -90,7 +90,7 @@ fn validate_actions(
         // Action is invalid, remove from queue and set status
         warn!(?bot_id, action = ?kind, ?id, ?status, "Invalid action");
         let ActionContainer { kind, id, .. } =
-            std::mem::replace(&mut current_action.0, None).unwrap();
+            current_action.0.take().unwrap();
 
         past_actions.push(ActionResult {
             action: kind,
@@ -141,7 +141,7 @@ fn is_action_invalid(
             }
 
             let new_pos = path.front().unwrap();
-            if !grid_world.in_bounds(&new_pos) {
+            if !grid_world.in_bounds(new_pos) {
                 return Some("Invalid Move: New pos out of bounds".into());
             }
 
@@ -249,7 +249,7 @@ fn apply_actions(
         };
 
         let ActionContainer { kind, id, .. } =
-            std::mem::replace(&mut current_action.0, None).unwrap();
+            current_action.0.take().unwrap();
 
         info!(?bot_id, action = ?kind, ?id, ?status, "Applied action");
         past_actions.push(ActionResult {

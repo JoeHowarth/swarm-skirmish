@@ -108,7 +108,7 @@ pub(super) fn init_random_crumbs_and_truffles(
             PawnKind::default(),
             team,
             Energy(100),
-            Pos((bot1_x, bot1_y).into()),
+            Pos((bot1_x, bot1_y)),
         ))
         .id();
     grid_world.set(bot1_x, bot1_y, CellState::new_with_pawn(bot1));
@@ -120,7 +120,7 @@ pub(super) fn init_random_crumbs_and_truffles(
             PawnKind::default(),
             team,
             Energy(100),
-            Pos((bot2_x, bot2_y).into()),
+            Pos((bot2_x, bot2_y)),
         ))
         .id();
     grid_world.set(bot2_x, bot2_y, CellState::new_with_pawn(bot2));

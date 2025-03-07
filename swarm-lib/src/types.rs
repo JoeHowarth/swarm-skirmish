@@ -198,9 +198,9 @@ impl std::fmt::Display for Energy {
 )]
 pub struct Pos(pub (usize, usize));
 
-impl Into<Vec2> for Pos {
-    fn into(self) -> Vec2 {
-        Vec2::new(self.x() as f32, self.y() as f32)
+impl From<Pos> for Vec2 {
+    fn from(val: Pos) -> Self {
+        Vec2::new(val.x() as f32, val.y() as f32)
     }
 }
 

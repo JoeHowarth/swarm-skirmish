@@ -273,8 +273,8 @@ fn create_radar_data(
     // Sort radar cells by manhattan distance from center, with direction as
     // tiebreaker for deterministic ordering
     radar.cells.sort_by_key(|cell| {
-        let dx = (cell.pos.x() as isize - bot_world_x).abs() as u32;
-        let dy = (cell.pos.y() as isize - bot_world_y).abs() as u32;
+        let dx = (cell.pos.x() as isize - bot_world_x).unsigned_abs() as u32;
+        let dy = (cell.pos.y() as isize - bot_world_y).unsigned_abs() as u32;
         let manhattan_distance = (dx + dy) * 100; // Scale by 100 to make room for direction tiebreaker
 
         // Calculate direction as u8 for tiebreaking

@@ -34,7 +34,7 @@ static MAP_SIZE: LazyLock<RwLock<Option<(usize, usize)>>> =
     LazyLock::new(|| RwLock::new(None));
 
 pub fn get_map_size() -> Option<(usize, usize)> {
-    MAP_SIZE.read().expect("Failed to read RWLock").clone()
+    *MAP_SIZE.read().expect("Failed to read RWLock")
 }
 
 #[derive(FromArgs)]

@@ -70,20 +70,17 @@ fn render_move_to(
             continue;
         };
 
-        match state {
-            ActionState::MoveTo { path } => {
-                let mut pos = *pos;
+        if let ActionState::MoveTo { path } = state {
+            let mut pos = *pos;
 
-                for dst in path {
-                    let src_world = tilemap_coords.pos_to_world(&pos);
-                    let dst_world = tilemap_coords.pos_to_world(dst);
+            for dst in path {
+                let src_world = tilemap_coords.pos_to_world(&pos);
+                let dst_world = tilemap_coords.pos_to_world(dst);
 
-                    gizmos.line_2d(src_world, dst_world, css::RED);
+                gizmos.line_2d(src_world, dst_world, css::RED);
 
-                    pos = *dst;
-                }
+                pos = *dst;
             }
-            _ => {}
         }
     }
 }
