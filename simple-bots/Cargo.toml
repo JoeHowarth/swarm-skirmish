@@ -1,0 +1,13 @@
+[package]
+name = "simple-bots"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+swarm-lib = { path = "../swarm-lib" }
+eyre = "0.6"
+rand = { version = "0.9", features = ["small_rng"] }
+serde = { workspace = true }
+
+[lib]
+crate-type = ["dylib"]

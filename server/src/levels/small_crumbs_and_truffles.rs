@@ -26,12 +26,7 @@ pub(super) fn init_small_crumbs_and_truffles(mut commands: Commands) {
     let mut grid_world = GridWorld::new(width, height, CellState::empty());
 
     let player = commands
-        .spawn((
-            PawnKind::default(),
-            Team::Player,
-            Energy(100),
-            Pos((2, 2)),
-        ))
+        .spawn((PawnKind::default(), Team::Player, Energy(100), Pos((2, 2))))
         .id();
 
     // let enemy = commands

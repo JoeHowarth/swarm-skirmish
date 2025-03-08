@@ -44,8 +44,8 @@ impl Plugin for BotUpdatePlugin {
     fn build(&self, app: &mut App) {
         let cont: Container<Api> = unsafe {
             Container::load(
-                "/Users/jh/personal/swarm-skirmish/target/debug/libdylib_bot.\
-                 dylib",
+                "/Users/jh/personal/swarm-skirmish/target/debug/\
+                 libsimple_bots.dylib",
             )
         }
         .expect("Could not open library or load symbols");
@@ -150,7 +150,7 @@ fn update_bots(
     }
 }
 
-pub fn create_server_updates<'a>(
+pub fn create_server_updates(
     tick: Res<Tick>,
     query: Query<(
         &BotId,

@@ -89,8 +89,7 @@ fn validate_actions(
 
         // Action is invalid, remove from queue and set status
         warn!(?bot_id, action = ?kind, ?id, ?status, "Invalid action");
-        let ActionContainer { kind, id, .. } =
-            current_action.0.take().unwrap();
+        let ActionContainer { kind, id, .. } = current_action.0.take().unwrap();
 
         past_actions.push(ActionResult {
             action: kind,
@@ -248,8 +247,7 @@ fn apply_actions(
             continue;
         };
 
-        let ActionContainer { kind, id, .. } =
-            current_action.0.take().unwrap();
+        let ActionContainer { kind, id, .. } = current_action.0.take().unwrap();
 
         info!(?bot_id, action = ?kind, ?id, ?status, "Applied action");
         past_actions.push(ActionResult {

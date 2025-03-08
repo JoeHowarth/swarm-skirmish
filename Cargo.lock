@@ -4143,6 +4143,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "simple-bots"
+version = "0.1.0"
+dependencies = [
+ "eyre",
+ "rand 0.9.0",
+ "serde",
+ "swarm-lib",
+]
+
+[[package]]
 name = "skrifa"
 version = "0.22.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"

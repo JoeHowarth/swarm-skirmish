@@ -10,39 +10,19 @@ use swarm_lib::{
     CellKind,
     CellStateRadar,
     Dir,
-    Item::*,
+    Item::{self, *},
     NewBotNoMangeFn,
     Pos,
     RadarData,
 };
 
-#[no_mangle]
-pub fn test_fn() -> String {
-    "Hello, world!".to_string()
-}
-
-#[no_mangle]
-pub fn new_bot(ctx: BotLogger, (map_w, map_h): (usize, usize)) -> Box<dyn Bot> {
-    Box::new(CrumbFollower {
-        grid: GridWorld::new(map_w, map_h, ClientCellState::default()),
-        rng: SmallRng::seed_from_u64(ctx.bot_id as u64),
-        ctx,
-        default_dir: Dir::Up,
-        action_counter: 0,
-        seen_bots: Vec::new(),
-    })
-}
-
-/// Type check
-static _X: NewBotNoMangeFn = new_bot;
-
 pub struct CrumbFollower {
-    ctx: BotLogger,
-    rng: SmallRng,
-    default_dir: Dir,
-    action_counter: u32,
-    grid: GridWorld<ClientCellState>,
-    seen_bots: Vec<ClientBotData>,
+    pub ctx: BotLogger,
+    pub rng: SmallRng,
+    pub default_dir: Dir,
+    pub action_counter: u32,
+    pub grid: GridWorld<ClientCellState>,
+    pub seen_bots: Vec<ClientBotData>,
 }
 
 use std::fmt;
