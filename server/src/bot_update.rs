@@ -126,11 +126,17 @@ fn update_bots(
         let action_container = ActionContainer {
             state: match &action.action {
                 Action::MoveTo(path) => ActionState::MoveTo {
-                    path: path.iter().skip(1).cloned().collect(),
+                    idx: 1.min(path.len().saturating_sub(1)),
                 },
                 Action::Noop => ActionState::None,
                 Action::MoveDir(_) => ActionState::None,
                 Action::Harvest(_) => ActionState::Harvest { remaining: 1 },
+                Action::Pickup(_) => ActionState::None,
+                Action::Drop(_) => ActionState::None,
+                Action::Transfer(_) => ActionState::None,
+                Action::Build(_dir, _building_kind) => ActionState::None,
+                Action::Recharge => ActionState::None,
+                Action::Attack(_dir) => ActionState::None,
             },
             kind: action.action,
             id: action.id,

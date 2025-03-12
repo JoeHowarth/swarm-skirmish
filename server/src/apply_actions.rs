@@ -39,9 +39,8 @@ pub struct ActionContainer {
 #[derive(Debug)]
 pub enum ActionState {
     None,
-    MoveTo { path: VecDeque<Pos> },
+    MoveTo { idx: usize },
     Harvest { remaining: u32 },
-    Transfer { remaining: u32 },
 }
 
 pub struct ActionsPlugin;
@@ -66,13 +65,20 @@ fn validate_actions(
         &BotId,
         &Pos,
         &Energy,
+        &Inventory,
         &mut CurrentAction,
         &mut PastActions,
     )>,
     grid_world: Res<GridWorld>,
 ) {
-    for (bot_id, pos, energy, mut current_action, mut past_actions) in
-        query.iter_mut()
+    for (
+        bot_id,
+        pos,
+        energy,
+        inventory,
+        mut current_action,
+        mut past_actions,
+    ) in query.iter_mut()
     {
         let Some(ActionContainer { kind, state, id }) = &current_action.0
         else {
@@ -81,7 +87,7 @@ fn validate_actions(
         };
 
         let Some(status) =
-            is_action_invalid(pos, energy, kind, state, &grid_world)
+            is_action_invalid(pos, energy, kind, state, &grid_world, inventory)
         else {
             // Action is valid, proceed
             continue;
@@ -106,12 +112,14 @@ fn is_action_invalid(
     kind: &Action,
     state: &ActionState,
     grid_world: &GridWorld,
+    inventory: &Inventory,
 ) -> Option<String> {
     if *energy < kind.energy_per_tick() {
         return Some("Insufficient Energy".into());
     }
 
     match kind {
+        Action::Noop => {}
         Action::MoveDir(dir) => {
             let Some(new_pos) = *pos + *dir else {
                 return Some("Invalid Move: Invalid direction".into());
@@ -131,7 +139,7 @@ fn is_action_invalid(
                 return Some("Invalid Move: Empty path".into());
             }
 
-            let ActionState::MoveTo { path } = state else {
+            let ActionState::MoveTo { idx } = state else {
                 return Some("Invalid Move: Not a move to action".into());
             };
 
@@ -139,12 +147,12 @@ fn is_action_invalid(
                 return Some("Invalid Move: Empty path".into());
             }
 
-            let new_pos = path.front().unwrap();
-            if !grid_world.in_bounds(new_pos) {
+            let new_pos = path[*idx];
+            if !grid_world.in_bounds(&new_pos) {
                 return Some("Invalid Move: New pos out of bounds".into());
             }
 
-            let cell = grid_world.get_pos(*new_pos);
+            let cell = grid_world.get_pos(new_pos);
             if !cell.can_enter() {
                 return Some("Invalid Move: Cannot enter new pos".into());
             }
@@ -152,7 +160,7 @@ fn is_action_invalid(
             // Check if new_pos is adjacent to current pos
             let is_adjacent = Dir::iter().any(|dir| {
                 if let Some(adjacent_pos) = *pos + dir {
-                    adjacent_pos == *new_pos
+                    adjacent_pos == new_pos
                 } else {
                     false
                 }
@@ -178,7 +186,53 @@ fn is_action_invalid(
                 return Some("Invalid Harvest: No truffle".into());
             }
         }
-        Action::Noop => {}
+        Action::Pickup((item, dir)) => {
+            let item_loc = dir.and_then(|dir| *pos + dir).unwrap_or(*pos);
+            if !grid_world.in_bounds(&item_loc) {
+                return Some("Invalid Pickup: Out of bounds".into());
+            }
+
+            let cell = grid_world.get_pos(item_loc);
+            if cell.item != Some(*item) {
+                return Some("Invalid Pickup: No item".into());
+            }
+        }
+        Action::Drop((item, dir)) => {
+            let item_loc = dir.and_then(|dir| *pos + dir).unwrap_or(*pos);
+            if !grid_world.in_bounds(&item_loc) {
+                return Some("Invalid Drop: Out of bounds".into());
+            }
+
+            let cell = grid_world.get_pos(item_loc);
+            if cell.item.is_some() {
+                return Some("Invalid Drop: Already has item".into());
+            }
+
+            if inventory.0.get(item) == Some(&0) {
+                return Some("Invalid Drop: No item".into());
+            }
+        }
+        Action::Transfer((item, dir)) => {
+            let Some(item_loc) = *pos + *dir else {
+                return Some("Invalid Transfer: Invalid direction".into());
+            };
+
+            if !grid_world.in_bounds(&item_loc) {
+                return Some("Invalid Transfer: Out of bounds".into());
+            }
+
+            let cell = grid_world.get_pos(item_loc);
+            if cell.pawn.is_none() {
+                return Some("Invalid Transfer: No pawn".into());
+            }
+
+            if inventory.0.get(item) == Some(&0) {
+                return Some("Invalid Transfer: No item".into());
+            }
+        }
+        Action::Build(dir, building_kind) => todo!(),
+        Action::Recharge => todo!(),
+        Action::Attack(dir) => todo!(),
     }
 
     None
@@ -197,6 +251,7 @@ fn apply_actions(
     )>,
     mut grid_world: ResMut<GridWorld>,
 ) {
+    let mut transfers = Vec::new();
     for (
         entity,
         bot_id,
@@ -217,6 +272,7 @@ fn apply_actions(
         *energy = (*energy - kind.energy_per_tick()).unwrap();
 
         let status = match &kind {
+            Action::Noop => Some(ActionStatus::Success),
             Action::MoveDir(dir) => {
                 grid_world.get_pos_mut(*pos).pawn = None;
                 *pos = (*pos + *dir).unwrap();
@@ -229,16 +285,37 @@ fn apply_actions(
                 *inventory.0.entry(Item::Truffle).or_default() += 1;
                 Some(ActionStatus::Success)
             }
-            Action::MoveTo(_) => {
-                if let ActionState::MoveTo { path } = state {
-                    apply_move_to(entity, &mut pos, path, &mut grid_world)
+            Action::MoveTo(path) => {
+                if let ActionState::MoveTo { idx } = state {
+                    apply_move_to(entity, &mut pos, path, idx, &mut grid_world)
                 } else {
                     Some(ActionStatus::Failure(
                         "Invalid Move: Not a move to action".into(),
                     ))
                 }
             }
-            Action::Noop => Some(ActionStatus::Success),
+            Action::Pickup((item, dir)) => {
+                let item_loc = dir.and_then(|dir| *pos + dir).unwrap_or(*pos);
+                grid_world.get_pos_mut(item_loc).item = None;
+                *inventory.0.entry(*item).or_default() += 1;
+                Some(ActionStatus::Success)
+            }
+            Action::Drop((item, dir)) => {
+                let item_loc = dir.and_then(|dir| *pos + dir).unwrap_or(*pos);
+                grid_world.get_pos_mut(item_loc).item = Some(*item);
+                *inventory.0.entry(*item).or_default() -= 1;
+                Some(ActionStatus::Success)
+            }
+            Action::Transfer((item, dir)) => {
+                let item_loc = *pos + *dir;
+                let pawn = grid_world.get_pos(item_loc.unwrap()).pawn.unwrap();
+                *inventory.0.entry(*item).or_default() -= 1;
+                transfers.push((pawn, *item));
+                Some(ActionStatus::Success)
+            }
+            Action::Build(dir, building_kind) => todo!(),
+            Action::Recharge => todo!(),
+            Action::Attack(dir) => todo!(),
         };
 
         let Some(status) = status else {
@@ -257,21 +334,28 @@ fn apply_actions(
             completed_tick: tick.0,
         });
     }
+
+    for (pawn, item) in transfers {
+        let mut inventory = query.get_mut(pawn).unwrap().5;
+        *inventory.0.entry(item).or_default() += 1;
+    }
 }
 
 fn apply_move_to(
     entity: Entity,
     pos: &mut Pos,
-    path: &mut VecDeque<Pos>,
+    path: &Vec<Pos>,
+    idx: &mut usize,
     grid_world: &mut GridWorld,
 ) -> Option<ActionStatus> {
     grid_world.get_pos_mut(*pos).pawn = None;
-    *pos = path.pop_front().unwrap();
+    *pos = path[*idx];
     grid_world.get_pos_mut(*pos).pawn = Some(entity);
 
-    if path.is_empty() {
+    if *idx == path.len() - 1 {
         Some(ActionStatus::Success)
     } else {
+        *idx += 1;
         None
     }
 }

@@ -6,7 +6,13 @@ use bevy::{
 };
 use bevy_ecs_tilemap::prelude::*;
 use image::DynamicImage;
-use swarm_lib::{Action::*, CellKind, Item, Pos, Team};
+use swarm_lib::{
+    Action::{self, *},
+    CellKind,
+    Item,
+    Pos,
+    Team,
+};
 
 use crate::{
     apply_actions::{ActionContainer, ActionState, CurrentAction},
@@ -66,14 +72,17 @@ fn render_move_to(
     };
 
     for (pos, current_action) in actions.iter() {
-        let Some(ActionContainer { state, .. }) = &current_action.0 else {
+        let Some(ActionContainer { kind, state, .. }) = &current_action.0
+        else {
             continue;
         };
 
-        if let ActionState::MoveTo { path } = state {
+        if let (Action::MoveTo(path), ActionState::MoveTo { idx }) =
+            (kind, state)
+        {
             let mut pos = *pos;
 
-            for dst in path {
+            for dst in &path[*idx..] {
                 let src_world = tilemap_coords.pos_to_world(&pos);
                 let dst_world = tilemap_coords.pos_to_world(dst);
 

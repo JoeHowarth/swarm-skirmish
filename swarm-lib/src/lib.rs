@@ -56,27 +56,48 @@ pub enum Action {
     MoveDir(Dir),
     MoveTo(Vec<Pos>),
     Harvest(Dir),
+    Pickup((Item, Option<Dir>)),
+    Drop((Item, Option<Dir>)),
+    Transfer((Item, Dir)),
+    Build(Dir, BuildingKind),
+    Recharge,
+    Attack(Dir),
+}
+
+#[derive(Debug, Clone)]
+pub enum BuildingKind {
+    Base,
 }
 
 impl Action {
-    pub fn total_energy(&self) -> Energy {
+    pub fn ticks_to_complete(&self) -> Option<u32> {
         match self {
-            Action::MoveDir(_) => 1,
-            Action::MoveTo(path) => path.len() as u32,
-            Action::Harvest(_) => 5,
-            Action::Noop => 0,
+            Action::MoveDir(_) => Some(1),
+            Action::MoveTo(path) => Some(path.len() as u32 - 1),
+            Action::Harvest(_) => Some(1),
+            Action::Noop => Some(1),
+            Action::Pickup(_) => Some(1),
+            Action::Drop(_) => Some(1),
+            Action::Transfer(_) => Some(1),
+            Action::Build(_, BuildingKind::Base) => None,
+            Action::Recharge => None,
+            Action::Attack(_) => Some(1),
         }
-        .into()
     }
 
     pub fn energy_per_tick(&self) -> Energy {
         match self {
-            Action::MoveDir(_) => 1,
-            Action::MoveTo(_) => 1,
-            Action::Harvest(_) => 5,
-            Action::Noop => 0,
+            Action::MoveDir(_) => 1.into(),
+            Action::MoveTo(_) => 1.into(),
+            Action::Harvest(_) => 5.into(),
+            Action::Noop => 0.into(),
+            Action::Pickup(_) => 2.into(),
+            Action::Drop(_) => 1.into(),
+            Action::Transfer(_) => 2.into(),
+            Action::Build(_, BuildingKind::Base) => 2.into(),
+            Action::Recharge => 0.into(),
+            Action::Attack(_) => 4.into(),
         }
-        .into()
     }
 }
 
