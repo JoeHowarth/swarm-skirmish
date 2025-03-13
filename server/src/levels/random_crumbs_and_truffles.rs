@@ -3,11 +3,11 @@ use bevy::{prelude::*, state::state::FreelyMutableState};
 use rand::{prelude::SliceRandom, Rng};
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumDiscriminants;
-use swarm_lib::{Energy, Item, Pos, Team};
+use swarm_lib::{BotData, Energy, FrameKind, Inventory, Item, Pos, Subsystems, Team};
 
 use super::Levels;
 use crate::{
-    types::{CellState, GridWorld, PawnKind},
+    types::{CellState, GridWorld},
     MAP_SIZE,
 };
 
@@ -105,10 +105,14 @@ pub(super) fn init_random_crumbs_and_truffles(
     let (bot1_x, bot1_y) = find_empty_cell(&grid_world);
     let bot1 = commands
         .spawn((
-            PawnKind::default(),
-            team,
-            Energy(100),
-            Pos((bot1_x, bot1_y)),
+            BotData {
+                frame_kind: FrameKind::default(),
+                team,
+                energy: Energy(100),
+                pos: Pos((bot1_x, bot1_y)),
+                inventory: Inventory::default(),
+                subsystems: Subsystems::default(),
+            },
         ))
         .id();
     grid_world.set(bot1_x, bot1_y, CellState::new_with_pawn(bot1));
@@ -117,10 +121,14 @@ pub(super) fn init_random_crumbs_and_truffles(
     let (bot2_x, bot2_y) = find_empty_cell(&grid_world);
     let bot2 = commands
         .spawn((
-            PawnKind::default(),
-            team,
-            Energy(100),
-            Pos((bot2_x, bot2_y)),
+            BotData {
+                frame_kind: FrameKind::default(),
+                team,
+                energy: Energy(100),
+                pos: Pos((bot2_x, bot2_y)),
+                inventory: Inventory::default(),
+                subsystems: Subsystems::default(),
+            },
         ))
         .id();
     grid_world.set(bot2_x, bot2_y, CellState::new_with_pawn(bot2));

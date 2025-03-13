@@ -14,7 +14,7 @@ use strum_macros::EnumDiscriminants;
 use swarm_lib::{Energy, Item, Pos, Team};
 
 use crate::{
-    types::{CellState, GridWorld, PawnKind},
+    types::{CellState, GridWorld},
     GameState,
     MAP_SIZE,
 };

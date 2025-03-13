@@ -24,15 +24,7 @@ pub enum Dir {
 }
 
 #[derive(
-    Component,
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    Serialize,
-    Deserialize,
-    Display,
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Display,
 )]
 pub enum Team {
     Player,
@@ -95,7 +87,6 @@ impl Dir {
 ///////// Energy ///////////
 ///////// ///////////////////
 #[derive(
-    Component,
     Debug,
     Copy,
     Clone,
@@ -193,9 +184,7 @@ impl std::fmt::Display for Energy {
 /////////// Pos ////////////
 /////////// /////////////////
 
-#[derive(
-    Component, Debug, Copy, Clone, Deserialize, Serialize, Eq, PartialEq,
-)]
+#[derive(Debug, Copy, Clone, Deserialize, Serialize, Eq, PartialEq)]
 pub struct Pos(pub (usize, usize));
 
 impl From<Pos> for Vec2 {

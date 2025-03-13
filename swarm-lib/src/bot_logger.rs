@@ -222,11 +222,13 @@ impl BotLogger {
 
         if update.tick % log_every_x_ticks == 0 {
             // Format items as a readable list
-            let items_str = if update.items.is_empty() {
+            let items_str = if update.bot_data.inventory.0.is_empty() {
                 "None".to_string()
             } else {
                 update
-                    .items
+                    .bot_data
+                    .inventory
+                    .0
                     .iter()
                     .map(|(item, count)| format!("{}: {}", item, count))
                     .collect::<Vec<_>>()
@@ -237,11 +239,11 @@ impl BotLogger {
                 "Bot Status Report [Tick {}]:\n{}\nEnergy: {}\nDetected Bots: \
                  {}\nItems: {}\nTeam: {:?}",
                 update.tick,
-                update.position,
-                update.energy.0,
+                update.bot_data.pos,
+                update.bot_data.energy,
                 update.radar.pawns.len(),
                 items_str,
-                update.team
+                update.bot_data.team
             ));
 
             // The print_radar method now logs internally

@@ -14,6 +14,7 @@ pub mod radar;
 pub mod types;
 
 pub use radar::*;
+use strum_macros::Display;
 pub use types::*;
 
 pub type NewBotNoMangeFn =
@@ -24,14 +25,21 @@ pub trait Bot: Sync + Send + 'static + std::fmt::Debug {
 }
 
 #[derive(Debug, Clone, Component)]
+pub struct BotData {
+    pub frame_kind: FrameKind,
+    pub subsystems: Subsystems,
+    pub energy: Energy,
+    pub inventory: Inventory,
+    pub pos: Pos,
+    pub team: Team,
+}
+
+#[derive(Debug, Clone, Component)]
 pub struct BotUpdate {
     pub tick: u32,
 
-    pub team: Team,
-    pub position: Pos,
+    pub bot_data: BotData,
     pub radar: RadarData,
-    pub items: HashMap<Item, u32>,
-    pub energy: Energy,
 
     // Result from previous action
     pub in_progress_action: Option<ActionWithId>,
@@ -41,6 +49,12 @@ pub struct BotUpdate {
 pub fn is_true(b: &bool) -> bool {
     *b
 }
+
+#[derive(Default, Debug, Clone)]
+pub struct Inventory(pub HashMap<Item, u32>);
+
+#[derive(Default, Debug, Clone)]
+pub struct Subsystems(pub HashMap<Subsystem, u8>);
 
 pub type ActionId = u32;
 
@@ -64,8 +78,41 @@ pub enum Action {
     Attack(Dir),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Default, Display, Copy, Clone, Debug)]
+pub enum FrameKind {
+    #[default]
+    Basic,
+    Building(BuildingKind),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Subsystem {
+    PlasmaRifle,
+    PowerCell,
+    CargoBay,
+    PrecisionOptics,
+    OpticalTransciever,
+    MiningDrill,
+    Assembler,
+}
+
+impl Subsystem {
+    pub fn slots_required(&self) -> u32 {
+        match self {
+            Subsystem::PlasmaRifle => 1,
+            Subsystem::PowerCell => 1,
+            Subsystem::CargoBay => 1,
+            Subsystem::PrecisionOptics => 2,
+            Subsystem::OpticalTransciever => 2,
+            Subsystem::MiningDrill => 3,
+            Subsystem::Assembler => 5,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum BuildingKind {
+    #[default]
     Base,
 }
 

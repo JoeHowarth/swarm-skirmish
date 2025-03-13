@@ -19,9 +19,18 @@ use bot_update::{BotId, BotUpdatePlugin, BotUpdateSystemSet};
 use levels::{Levels, LevelsDiscriminants, LevelsPlugin};
 use serde::{Deserialize, Serialize};
 use strum::IntoDiscriminant;
-use swarm_lib::{bot_logger::BotLogger, Bot, Energy, Item, Pos, Team};
+use swarm_lib::{
+    bot_logger::BotLogger,
+    Bot,
+    BotData,
+    Energy,
+    FrameKind,
+    Item,
+    Pos,
+    Team,
+};
 use tilemap::TilemapSystemSimUpdateSet;
-use types::{CellState, GridWorld, Inventory, PawnKind};
+use types::{CellState, GridWorld};
 
 mod apply_actions;
 mod bot_update;
@@ -88,7 +97,7 @@ fn main() {
         .add_systems(Startup, camera_setup)
         .add_systems(
             OnExit(GameState::InGame),
-            |mut commands: Commands, pawns: Query<Entity, With<PawnKind>>| {
+            |mut commands: Commands, pawns: Query<Entity, With<BotData>>| {
                 for pawn in pawns.iter() {
                     commands.entity(pawn).despawn_recursive();
                 }
@@ -148,29 +157,32 @@ struct WinDisplay;
 
 fn check_win_condition(
     mut commands: Commands,
-    query: Query<(&BotId, &Inventory, &Team)>,
+    query: Query<(&BotId, &BotData)>,
     won: Option<Res<Won>>,
     mut next_state: ResMut<NextState<GameState>>,
 ) {
     if won.is_some() {
         return;
     }
-    for (bot, inventory, team) in query.iter() {
-        let Some(&amt) = inventory.get(&Item::Fent) else {
+    for (bot_id, bot_data) in query.iter() {
+        let Some(&amt) = bot_data.inventory.0.get(&Item::Fent) else {
             continue;
         };
         if amt == 0 {
             continue;
         }
 
-        let Some(&amt) = inventory.get(&Item::Truffle) else {
+        let Some(&amt) = bot_data.inventory.0.get(&Item::Truffle) else {
             continue;
         };
         if amt < 2 {
             continue;
         }
-        info!("Team {team} won! Bot {bot:?} picked up the Fent and 2 Truffles");
-        commands.insert_resource(Won(*team));
+        info!(
+            "Team {team} won! Bot {bot_id:?} picked up the Fent and 2 Truffles",
+            team = bot_data.team
+        );
+        commands.insert_resource(Won(bot_data.team));
         next_state.set(GameState::Idle);
     }
 }

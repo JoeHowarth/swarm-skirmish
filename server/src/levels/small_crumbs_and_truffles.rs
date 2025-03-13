@@ -1,11 +1,11 @@
 use argh::FromArgs;
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
-use swarm_lib::{Energy, Item, Pos, Team};
+use swarm_lib::{BotData, Energy, FrameKind, Inventory, Item, Pos, Subsystems, Team};
 
 use super::Levels;
 use crate::{
-    types::{CellState, GridWorld, PawnKind},
+    types::{CellState, GridWorld},
     MAP_SIZE,
 };
 
@@ -26,9 +26,17 @@ pub(super) fn init_small_crumbs_and_truffles(mut commands: Commands) {
     let mut grid_world = GridWorld::new(width, height, CellState::empty());
 
     let player = commands
-        .spawn((PawnKind::default(), Team::Player, Energy(100), Pos((2, 2))))
+        .spawn((
+            BotData {
+                frame_kind: FrameKind::default(),
+                team: Team::Player,
+                energy: Energy(100),
+                pos: Pos((2, 2)),
+                inventory: Inventory::default(),
+                subsystems: Subsystems::default(),
+            },
+        ))
         .id();
-
     // let enemy = commands
     //     .spawn((PawnKind::FindBot, Team::Enemy, Pos((13, 13).into())))
     //     .id();

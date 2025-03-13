@@ -195,7 +195,7 @@ impl Bot for CrumbFollower {
 
         // Determine the next action using a linear decision flow
         let action = self.determine_next_action(
-            update.position,
+            update.bot_data.pos,
             &update.radar,
             update.tick,
         );

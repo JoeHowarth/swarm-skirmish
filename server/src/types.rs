@@ -1,21 +1,21 @@
 use bevy::{prelude::*, utils::HashMap};
 use strum_macros::Display;
-use swarm_lib::{gridworld, gridworld::PassableCell, CellKind, Energy, Item};
+use swarm_lib::{
+    gridworld::{self, PassableCell},
+    BuildingKind,
+    CellKind,
+    Energy,
+    FrameKind,
+    Item,
+    Pos,
+    Subsystem,
+    Team,
+};
 
 pub type GridWorld = gridworld::GridWorld<CellState>;
 
-#[derive(Component, Default, Deref, DerefMut)]
-pub struct Inventory(pub HashMap<Item, u32>);
-
 #[derive(Resource, Default)]
 pub struct Tick(pub u32);
-
-#[derive(Component, Default, Display, Copy, Clone)]
-#[require(Inventory, Energy)]
-pub enum PawnKind {
-    #[default]
-    Basic,
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct CellState {

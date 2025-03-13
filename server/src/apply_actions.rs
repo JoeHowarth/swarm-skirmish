@@ -9,15 +9,17 @@ use swarm_lib::{
     ActionStatus,
     ActionStatusDiscriminants,
     ActionWithId,
+    BotData,
     Dir,
     Energy,
+    FrameKind,
     Item,
     Team,
 };
 
 use crate::{
     bot_update::{BotId, BotIdToEntity},
-    types::{GridWorld, Inventory, Tick},
+    types::{GridWorld, Tick},
     Pos,
 };
 
@@ -61,24 +63,11 @@ impl Plugin for ActionsPlugin {
 
 fn validate_actions(
     tick: Res<Tick>,
-    mut query: Query<(
-        &BotId,
-        &Pos,
-        &Energy,
-        &Inventory,
-        &mut CurrentAction,
-        &mut PastActions,
-    )>,
+    mut query: Query<(&BotId, &BotData, &mut CurrentAction, &mut PastActions)>,
     grid_world: Res<GridWorld>,
 ) {
-    for (
-        bot_id,
-        pos,
-        energy,
-        inventory,
-        mut current_action,
-        mut past_actions,
-    ) in query.iter_mut()
+    for (bot_id, bot_data, mut current_action, mut past_actions) in
+        query.iter_mut()
     {
         let Some(ActionContainer { kind, state, id }) = &current_action.0
         else {
@@ -87,7 +76,7 @@ fn validate_actions(
         };
 
         let Some(status) =
-            is_action_invalid(pos, energy, kind, state, &grid_world, inventory)
+            is_action_invalid(kind, state, &grid_world, bot_data)
         else {
             // Action is valid, proceed
             continue;
@@ -107,21 +96,19 @@ fn validate_actions(
 }
 
 fn is_action_invalid(
-    pos: &Pos,
-    energy: &Energy,
     kind: &Action,
     state: &ActionState,
     grid_world: &GridWorld,
-    inventory: &Inventory,
+    bot_data: &BotData,
 ) -> Option<String> {
-    if *energy < kind.energy_per_tick() {
+    if bot_data.energy < kind.energy_per_tick() {
         return Some("Insufficient Energy".into());
     }
 
     match kind {
         Action::Noop => {}
         Action::MoveDir(dir) => {
-            let Some(new_pos) = *pos + *dir else {
+            let Some(new_pos) = bot_data.pos + *dir else {
                 return Some("Invalid Move: Invalid direction".into());
             };
 
@@ -159,7 +146,7 @@ fn is_action_invalid(
 
             // Check if new_pos is adjacent to current pos
             let is_adjacent = Dir::iter().any(|dir| {
-                if let Some(adjacent_pos) = *pos + dir {
+                if let Some(adjacent_pos) = bot_data.pos + dir {
                     adjacent_pos == new_pos
                 } else {
                     false
@@ -173,7 +160,7 @@ fn is_action_invalid(
             }
         }
         Action::Harvest(dir) => {
-            let Some(target_pos) = *pos + *dir else {
+            let Some(target_pos) = bot_data.pos + *dir else {
                 return Some("Invalid Harvest: Invalid direction".into());
             };
 
@@ -187,7 +174,9 @@ fn is_action_invalid(
             }
         }
         Action::Pickup((item, dir)) => {
-            let item_loc = dir.and_then(|dir| *pos + dir).unwrap_or(*pos);
+            let item_loc = dir
+                .and_then(|dir| bot_data.pos + dir)
+                .unwrap_or(bot_data.pos);
             if !grid_world.in_bounds(&item_loc) {
                 return Some("Invalid Pickup: Out of bounds".into());
             }
@@ -198,7 +187,9 @@ fn is_action_invalid(
             }
         }
         Action::Drop((item, dir)) => {
-            let item_loc = dir.and_then(|dir| *pos + dir).unwrap_or(*pos);
+            let item_loc = dir
+                .and_then(|dir| bot_data.pos + dir)
+                .unwrap_or(bot_data.pos);
             if !grid_world.in_bounds(&item_loc) {
                 return Some("Invalid Drop: Out of bounds".into());
             }
@@ -208,12 +199,12 @@ fn is_action_invalid(
                 return Some("Invalid Drop: Already has item".into());
             }
 
-            if inventory.0.get(item) == Some(&0) {
+            if bot_data.inventory.0.get(item) == Some(&0) {
                 return Some("Invalid Drop: No item".into());
             }
         }
         Action::Transfer((item, dir)) => {
-            let Some(item_loc) = *pos + *dir else {
+            let Some(item_loc) = bot_data.pos + *dir else {
                 return Some("Invalid Transfer: Invalid direction".into());
             };
 
@@ -226,7 +217,7 @@ fn is_action_invalid(
                 return Some("Invalid Transfer: No pawn".into());
             }
 
-            if inventory.0.get(item) == Some(&0) {
+            if bot_data.inventory.0.get(item) == Some(&0) {
                 return Some("Invalid Transfer: No item".into());
             }
         }
@@ -243,24 +234,15 @@ fn apply_actions(
     mut query: Query<(
         Entity,
         &BotId,
-        &mut Pos,
+        &mut BotData,
         &mut CurrentAction,
         &mut PastActions,
-        &mut Inventory,
-        &mut Energy,
     )>,
     mut grid_world: ResMut<GridWorld>,
 ) {
     let mut transfers = Vec::new();
-    for (
-        entity,
-        bot_id,
-        mut pos,
-        mut current_action,
-        mut past_actions,
-        mut inventory,
-        mut energy,
-    ) in query.iter_mut()
+    for (entity, bot_id, mut bot_data, mut current_action, mut past_actions) in
+        query.iter_mut()
     {
         // Present action is valid and can be applied without checks
         let Some(ActionContainer { kind, state, id }) = &mut current_action.0
@@ -269,25 +251,31 @@ fn apply_actions(
         };
 
         // Decrease energy
-        *energy = (*energy - kind.energy_per_tick()).unwrap();
+        bot_data.energy = (bot_data.energy - kind.energy_per_tick()).unwrap();
 
         let status = match &kind {
             Action::Noop => Some(ActionStatus::Success),
             Action::MoveDir(dir) => {
-                grid_world.get_pos_mut(*pos).pawn = None;
-                *pos = (*pos + *dir).unwrap();
-                grid_world.get_pos_mut(*pos).pawn = Some(entity);
+                grid_world.get_pos_mut(bot_data.pos).pawn = None;
+                bot_data.pos = (bot_data.pos + *dir).unwrap();
+                grid_world.get_pos_mut(bot_data.pos).pawn = Some(entity);
                 Some(ActionStatus::Success)
             }
             Action::Harvest(dir) => {
-                let target_pos = *pos + *dir;
+                let target_pos = bot_data.pos + *dir;
                 grid_world.get_pos_mut(target_pos.unwrap()).item = None;
-                *inventory.0.entry(Item::Truffle).or_default() += 1;
+                *bot_data.inventory.0.entry(Item::Truffle).or_default() += 1;
                 Some(ActionStatus::Success)
             }
             Action::MoveTo(path) => {
                 if let ActionState::MoveTo { idx } = state {
-                    apply_move_to(entity, &mut pos, path, idx, &mut grid_world)
+                    apply_move_to(
+                        entity,
+                        &mut bot_data.pos,
+                        path,
+                        idx,
+                        &mut grid_world,
+                    )
                 } else {
                     Some(ActionStatus::Failure(
                         "Invalid Move: Not a move to action".into(),
@@ -295,21 +283,25 @@ fn apply_actions(
                 }
             }
             Action::Pickup((item, dir)) => {
-                let item_loc = dir.and_then(|dir| *pos + dir).unwrap_or(*pos);
+                let item_loc = dir
+                    .and_then(|dir| bot_data.pos + dir)
+                    .unwrap_or(bot_data.pos);
                 grid_world.get_pos_mut(item_loc).item = None;
-                *inventory.0.entry(*item).or_default() += 1;
+                *bot_data.inventory.0.entry(*item).or_default() += 1;
                 Some(ActionStatus::Success)
             }
             Action::Drop((item, dir)) => {
-                let item_loc = dir.and_then(|dir| *pos + dir).unwrap_or(*pos);
+                let item_loc = dir
+                    .and_then(|dir| bot_data.pos + dir)
+                    .unwrap_or(bot_data.pos);
                 grid_world.get_pos_mut(item_loc).item = Some(*item);
-                *inventory.0.entry(*item).or_default() -= 1;
+                *bot_data.inventory.0.entry(*item).or_default() -= 1;
                 Some(ActionStatus::Success)
             }
             Action::Transfer((item, dir)) => {
-                let item_loc = *pos + *dir;
+                let item_loc = bot_data.pos + *dir;
                 let pawn = grid_world.get_pos(item_loc.unwrap()).pawn.unwrap();
-                *inventory.0.entry(*item).or_default() -= 1;
+                *bot_data.inventory.0.entry(*item).or_default() -= 1;
                 transfers.push((pawn, *item));
                 Some(ActionStatus::Success)
             }
@@ -336,7 +328,7 @@ fn apply_actions(
     }
 
     for (pawn, item) in transfers {
-        let mut inventory = query.get_mut(pawn).unwrap().5;
+        let inventory = &mut query.get_mut(pawn).unwrap().2.inventory;
         *inventory.0.entry(item).or_default() += 1;
     }
 }

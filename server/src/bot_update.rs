@@ -1,25 +1,12 @@
 use bevy::{prelude::*, utils::HashMap};
 use dlopen2::wrapper::{Container, WrapperApi};
 use swarm_lib::{
-    bot_logger::BotLogger,
-    Action,
-    ActionResult,
-    ActionStatus,
-    ActionWithId,
-    Bot,
-    BotUpdate,
-    CellKind,
-    CellStateRadar,
-    Energy,
-    Pos,
-    RadarBotData,
-    RadarData,
-    Team,
+    bot_logger::BotLogger, Action, ActionResult, ActionStatus, ActionWithId, Bot, BotData, BotUpdate, CellKind, CellStateRadar, Energy, FrameKind, Pos, RadarBotData, RadarData, Team
 };
 
 use crate::{
     apply_actions::{ActionContainer, ActionState, CurrentAction, PastActions},
-    types::{GridWorld, Inventory, PawnKind, Tick},
+    types::{GridWorld, Tick},
 };
 
 #[derive(WrapperApi)]
@@ -72,7 +59,7 @@ pub struct BotIdToEntity(pub HashMap<BotId, Entity>);
 fn ensure_bot_id(
     mut bot_id_to_entity: ResMut<BotIdToEntity>,
     mut commands: Commands,
-    query: Query<Entity, (With<PawnKind>, Without<BotId>)>,
+    query: Query<Entity, (With<BotData>, Without<BotId>)>,
     mut next_id: Local<u32>,
     bot_lib: Res<BotLib>,
     map_size: Query<&bevy_ecs_tilemap::prelude::TilemapSize>,
@@ -158,83 +145,62 @@ fn update_bots(
 
 pub fn create_server_updates(
     tick: Res<Tick>,
-    query: Query<(
-        &BotId,
-        &Pos,
-        &Team,
-        &CurrentAction,
-        &PastActions,
-        &Inventory,
-        &Energy,
-    )>,
+    query: Query<(&BotId, &BotData, &CurrentAction, &PastActions)>,
     grid_world: Res<GridWorld>,
 ) -> HashMap<BotId, BotUpdate> {
+    let extract_bot_id_and_team =
+        |e: Entity| query.get(e).map(|(a, b, _, _)| (a, &b.team)).ok();
+
     query
         .iter()
-        .map(
-            |(
-                bot_id,
-                pos,
-                team,
-                current_action,
-                past_actions,
-                inventory,
-                energy,
-            )| {
-                (
-                    *bot_id,
-                    BotUpdate {
-                        tick: tick.0,
-                        team: *team,
-                        position: *pos,
-                        radar: create_radar_data(pos, &grid_world, &query),
-                        in_progress_action: {
-                            current_action.as_ref().map(|action_container| {
-                                ActionWithId {
-                                    action: action_container.kind.clone(),
-                                    id: action_container.id,
-                                }
-                            })
-                        },
-                        completed_action: {
-                            past_actions.last().and_then(|action| {
-                                if action.completed_tick == tick.0 {
-                                    Some(ActionResult {
-                                        action: action.action.clone(),
-                                        status: action.status.clone(),
-                                        id: action.id,
-                                        completed_tick: tick.0,
-                                    })
-                                } else {
-                                    None
-                                }
-                            })
-                        },
-                        items: inventory.0.clone(),
-                        energy: *energy,
+        .map(|(bot_id, bot_data, current_action, past_actions)| {
+            (
+                *bot_id,
+                BotUpdate {
+                    tick: tick.0,
+                    radar: create_radar_data(
+                        &bot_data.pos,
+                        &grid_world,
+                        extract_bot_id_and_team,
+                    ),
+                    in_progress_action: {
+                        current_action.as_ref().map(|action_container| {
+                            ActionWithId {
+                                action: action_container.kind.clone(),
+                                id: action_container.id,
+                            }
+                        })
                     },
-                )
-            },
-        )
+                    completed_action: {
+                        past_actions.last().and_then(|action| {
+                            if action.completed_tick == tick.0 {
+                                Some(ActionResult {
+                                    action: action.action.clone(),
+                                    status: action.status.clone(),
+                                    id: action.id,
+                                    completed_tick: tick.0,
+                                })
+                            } else {
+                                None
+                            }
+                        })
+                    },
+                    bot_data: bot_data.clone(),
+                },
+            )
+        })
         .collect()
 }
 
-fn create_radar_data(
+fn create_radar_data<'a>(
     pos: &Pos,
     grid_world: &GridWorld,
-    query: &Query<(
-        &BotId,
-        &Pos,
-        &Team,
-        &CurrentAction,
-        &PastActions,
-        &Inventory,
-        &Energy,
-    )>,
+    get: impl Fn(Entity) -> Option<(&'a BotId, &'a Team)>,
 ) -> RadarData {
     // Define the radar range (how far to look in each direction)
-    let radar_range = 5; // This gives a view of 11x11 cells centered on the bot (5 in each
-                         // direction)
+    // This gives a view of 11x11 cells centered on the bot (5 in each
+    // direction)
+    let radar_range = 5;
 
     // Get bot's world coordinates
     let (bot_world_x, bot_world_y) = pos.as_isize();
@@ -258,7 +224,7 @@ fn create_radar_data(
                     CellKind::Unknown => unreachable!(),
                 },
                 pawn: cell.pawn.map(|e| {
-                    let (bot_id, _, &team, _, _, _, _) = query.get(e).unwrap();
+                    let (bot_id, &team) = get(e).unwrap();
 
                     // Store the bot's position in world coordinates
                     radar.pawns.push(RadarBotData {

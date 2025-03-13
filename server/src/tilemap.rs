@@ -8,6 +8,7 @@ use bevy_ecs_tilemap::prelude::*;
 use image::DynamicImage;
 use swarm_lib::{
     Action::{self, *},
+    BotData,
     CellKind,
     Item,
     Pos,
@@ -64,14 +65,14 @@ impl Plugin for TilemapPlugin {
 
 fn render_move_to(
     mut gizmos: Gizmos,
-    actions: Query<(&Pos, &CurrentAction)>,
+    actions: Query<(&BotData, &CurrentAction)>,
     tilemap_coords: Option<Res<TilemapWorldCoords>>,
 ) {
     let Some(tilemap_coords) = tilemap_coords else {
         return;
     };
 
-    for (pos, current_action) in actions.iter() {
+    for (bot_data, current_action) in actions.iter() {
         let Some(ActionContainer { kind, state, .. }) = &current_action.0
         else {
             continue;
@@ -80,7 +81,7 @@ fn render_move_to(
         if let (Action::MoveTo(path), ActionState::MoveTo { idx }) =
             (kind, state)
         {
-            let mut pos = *pos;
+            let mut pos = bot_data.pos;
 
             for dst in &path[*idx..] {
                 let src_world = tilemap_coords.pos_to_world(&pos);
@@ -156,7 +157,7 @@ fn remove_map(
 fn render_grid(
     tile_storage: Query<&mut TileStorage>,
     mut tiles: Query<&mut TileTextureIndex>,
-    teams: Query<&Team>,
+    teams: Query<&BotData>,
     grid: Res<GridWorld>,
 ) {
     let tile_storage = tile_storage.single();
@@ -221,10 +222,13 @@ impl CellRender {
         })
     }
 
-    pub fn from_state(state: &CellState, teams: &Query<&Team>) -> CellRender {
+    pub fn from_state(
+        state: &CellState,
+        query: &Query<&BotData>,
+    ) -> CellRender {
         if let Some(pawn_id) = state.pawn {
             return CellRender::Pawn(
-                teams.get(pawn_id).unwrap() == &Team::Player,
+                query.get(pawn_id).unwrap().team == Team::Player,
             );
         }
 
