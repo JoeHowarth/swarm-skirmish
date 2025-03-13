@@ -1,7 +1,22 @@
 use bevy::{prelude::*, utils::HashMap};
 use dlopen2::wrapper::{Container, WrapperApi};
 use swarm_lib::{
-    bot_logger::BotLogger, Action, ActionResult, ActionStatus, ActionWithId, Bot, BotData, BotUpdate, CellKind, CellStateRadar, Energy, FrameKind, Pos, RadarBotData, RadarData, Team
+    bot_logger::BotLogger,
+    Action,
+    ActionResult,
+    ActionStatus,
+    ActionWithId,
+    Bot,
+    BotData,
+    BotUpdate,
+    CellKind,
+    CellStateRadar,
+    Energy,
+    FrameKind,
+    Pos,
+    RadarBotData,
+    RadarData,
+    Team,
 };
 
 use crate::{
@@ -117,12 +132,14 @@ fn update_bots(
                 },
                 Action::Noop => ActionState::None,
                 Action::MoveDir(_) => ActionState::None,
-                Action::Harvest(_) => ActionState::Harvest { remaining: 1 },
+                Action::Harvest(_) => ActionState::None,
                 Action::Pickup(_) => ActionState::None,
                 Action::Drop(_) => ActionState::None,
                 Action::Transfer(_) => ActionState::None,
-                Action::Build(_dir, _building_kind) => ActionState::None,
-                Action::Recharge => ActionState::None,
+                Action::Build(_dir, _building_kind, _subsystems) => {
+                    ActionState::None
+                }
+                Action::Recharge(_dir) => ActionState::None,
                 Action::Attack(_dir) => ActionState::None,
             },
             kind: action.action,

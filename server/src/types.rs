@@ -9,6 +9,7 @@ use swarm_lib::{
     Item,
     Pos,
     Subsystem,
+    Subsystems,
     Team,
 };
 
@@ -16,6 +17,16 @@ pub type GridWorld = gridworld::GridWorld<CellState>;
 
 #[derive(Resource, Default)]
 pub struct Tick(pub u32);
+
+#[derive(Component, Clone)]
+pub struct PartiallyBuiltBot {
+    pub frame_kind: FrameKind,
+    pub subsystems: Subsystems,
+    pub pos: Pos,
+    pub team: Team,
+    pub _ticks_required: u32,
+    pub ticks_remaining: u32,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct CellState {

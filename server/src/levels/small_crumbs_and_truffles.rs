@@ -1,7 +1,17 @@
 use argh::FromArgs;
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
-use swarm_lib::{BotData, Energy, FrameKind, Inventory, Item, Pos, Subsystems, Team};
+use swarm_lib::{
+    BotData,
+    Energy,
+    FrameKind,
+    Inventory,
+    Item,
+    Pos,
+    Subsystem,
+    Subsystems,
+    Team,
+};
 
 use super::Levels;
 use crate::{
@@ -26,23 +36,21 @@ pub(super) fn init_small_crumbs_and_truffles(mut commands: Commands) {
     let mut grid_world = GridWorld::new(width, height, CellState::empty());
 
     let player = commands
-        .spawn((
-            BotData {
-                frame_kind: FrameKind::default(),
-                team: Team::Player,
-                energy: Energy(100),
-                pos: Pos((2, 2)),
-                inventory: Inventory::default(),
-                subsystems: Subsystems::default(),
+        .spawn(BotData {
+            frame_kind: FrameKind::default(),
+            team: Team::Player,
+            energy: Energy(100),
+            pos: Pos((2, 2)),
+            inventory: Inventory::default(),
+            subsystems: {
+                let mut subsystems = Subsystems::default();
+                subsystems.insert(Subsystem::CargoBay, 1);
+                subsystems
             },
-        ))
+        })
         .id();
-    // let enemy = commands
-    //     .spawn((PawnKind::FindBot, Team::Enemy, Pos((13, 13).into())))
-    //     .id();
 
     grid_world.set(2, 2, CellState::new_with_pawn(player));
-    // grid_world.set(13, 13, CellState::new_with_pawn(enemy));
 
     for y in 1..10 {
         grid_world.set(10, y, CellState::blocked());

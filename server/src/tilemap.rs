@@ -219,6 +219,7 @@ impl CellRender {
             CellRender::Item(Item::Crumb) => 250,
             CellRender::Item(Item::Fent) => 239,
             CellRender::Item(Item::Truffle) => 84, // 'T' in ASCII
+            CellRender::Item(Item::Metal) => 109, // 'M' in ASCII
         })
     }
 

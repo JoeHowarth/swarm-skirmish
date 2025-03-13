@@ -1,10 +1,11 @@
 use argh::{FromArgValue, FromArgs};
-use bevy::{prelude::*, state::state::FreelyMutableState};
+use bevy::{prelude::*, state::state::FreelyMutableState, utils::HashMap};
 use rand::{prelude::SliceRandom, Rng};
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumDiscriminants;
 use swarm_lib::{
     BotData,
+    BuildingKind,
     Energy,
     FrameKind,
     Inventory,
@@ -26,10 +27,10 @@ use crate::{
 )]
 #[argh(
     subcommand,
-    name = "random-crumbs-and-truffles",
-    description = "A random map with crumbs and truffles"
+    name = "econ-loop",
+    description = "Scenario to test economic loop"
 )]
-pub struct RandomCrumbsAndTrufflesArgs {
+pub struct EconLoopArgs {
     #[argh(option, default = "20")]
     /// the width of the map
     pub width: usize,
@@ -38,13 +39,10 @@ pub struct RandomCrumbsAndTrufflesArgs {
     pub height: usize,
 }
 
-pub(super) fn init_random_crumbs_and_truffles(
-    mut commands: Commands,
-    level_args: Res<Levels>,
-) {
+pub(super) fn init_econ_loop(mut commands: Commands, level_args: Res<Levels>) {
     let args = match &*level_args {
-        Levels::RandomCrumbsAndTruffles(args) => args,
-        _ => panic!("Expected RandomCrumbsAndTruffles level"),
+        Levels::EconLoop(args) => args,
+        _ => panic!("Expected EconLoop level"),
     };
 
     let (width, height) = (args.width, args.height);
@@ -108,55 +106,31 @@ pub(super) fn init_random_crumbs_and_truffles(
         }
     };
 
-    // Place 2 bots of the same team
+    // Place 1 bots of the same team
     let team = Team::Player;
 
     // Place first bot
     let (bot1_x, bot1_y) = find_empty_cell(&grid_world);
     let bot1 = commands
         .spawn(BotData {
-            frame_kind: FrameKind::default(),
+            frame_kind: FrameKind::Building(BuildingKind::Small),
             team,
-            energy: Energy(100),
+            energy: Energy(400),
             pos: Pos((bot1_x, bot1_y)),
-            inventory: Inventory::default(),
-            subsystems: {
-                let mut subsystems = Subsystems::default();
-                subsystems.insert(Subsystem::CargoBay, 1);
-                subsystems
-            },
+            inventory: Inventory(HashMap::from([(Item::Metal, 10)])),
+            subsystems: Subsystems(HashMap::from([
+                (Subsystem::Assembler, 1),
+                (Subsystem::CargoBay, 2),
+                (Subsystem::PowerCell, 3),
+            ])),
         })
         .id();
     grid_world.set(bot1_x, bot1_y, CellState::new_with_pawn(bot1));
 
-    // Place second bot
-    let (bot2_x, bot2_y) = find_empty_cell(&grid_world);
-    let bot2 = commands
-        .spawn(BotData {
-            frame_kind: FrameKind::default(),
-            team,
-            energy: Energy(100),
-            pos: Pos((bot2_x, bot2_y)),
-            inventory: Inventory::default(),
-            subsystems: {
-                let mut subsystems = Subsystems::default();
-                subsystems.insert(Subsystem::CargoBay, 1);
-                subsystems
-            },
-        })
-        .id();
-    grid_world.set(bot2_x, bot2_y, CellState::new_with_pawn(bot2));
-
-    // Place 2 Fent items
-    for _ in 0..2 {
+    // Place 200 metal items
+    for _ in 0..200 {
         let (x, y) = find_empty_cell(&grid_world);
-        grid_world.get_mut(x, y).item = Some(Item::Fent);
-    }
-
-    // Place 3 Truffle items
-    for _ in 0..3 {
-        let (x, y) = find_empty_cell(&grid_world);
-        grid_world.get_mut(x, y).item = Some(Item::Truffle);
+        grid_world.get_mut(x, y).item = Some(Item::Metal);
     }
 
     commands.insert_resource(grid_world);

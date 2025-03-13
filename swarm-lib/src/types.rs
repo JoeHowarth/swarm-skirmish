@@ -1,9 +1,45 @@
-use std::ops::{Add, Sub};
+use std::ops::{Add, Deref, DerefMut, Sub};
 
-use bevy_ecs::component::Component;
 use bevy_math::{IVec2, UVec2, Vec2};
+use bevy_utils::HashMap;
 use serde::{Deserialize, Serialize};
 use strum_macros::Display;
+
+use crate::Subsystem;
+
+#[derive(Default, Debug, Clone)]
+pub struct Inventory(pub HashMap<Item, u32>);
+
+impl Deref for Inventory {
+    type Target = HashMap<Item, u32>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for Inventory {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct Subsystems(pub HashMap<Subsystem, u8>);
+
+impl Deref for Subsystems {
+    type Target = HashMap<Subsystem, u8>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for Subsystems {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 
 #[derive(
     Debug,
@@ -56,6 +92,7 @@ pub enum Item {
     Crumb,
     Fent,
     Truffle,
+    Metal,
 }
 
 impl Dir {

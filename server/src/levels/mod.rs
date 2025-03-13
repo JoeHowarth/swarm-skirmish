@@ -1,5 +1,6 @@
 use argh::{FromArgValue, FromArgs};
 use bevy::{prelude::*, state::state::FreelyMutableState};
+use econ_loop::EconLoopArgs;
 use rand::{prelude::SliceRandom, Rng};
 use random_crumbs_and_truffles::{
     init_random_crumbs_and_truffles,
@@ -19,6 +20,7 @@ use crate::{
     MAP_SIZE,
 };
 
+mod econ_loop;
 mod random_crumbs_and_truffles;
 mod small_crumbs_and_truffles;
 
@@ -33,6 +35,10 @@ impl Plugin for LevelsPlugin {
         .add_systems(
             OnEnter(LevelsDiscriminants::RandomCrumbsAndTruffles),
             (init_random_crumbs_and_truffles, transition_to_in_game),
+        )
+        .add_systems(
+            OnEnter(LevelsDiscriminants::EconLoop),
+            (econ_loop::init_econ_loop, transition_to_in_game),
         );
     }
 }
@@ -54,6 +60,7 @@ impl Plugin for LevelsPlugin {
 pub enum Levels {
     SmallCrumbsAndTruffles(SmallCrumbsAndTrufflesArgs),
     RandomCrumbsAndTruffles(RandomCrumbsAndTrufflesArgs),
+    EconLoop(EconLoopArgs),
 }
 
 impl Default for Levels {
@@ -77,6 +84,7 @@ impl FromArgValue for LevelsDiscriminants {
             "random-crumbs-and-truffles" => {
                 LevelsDiscriminants::RandomCrumbsAndTruffles
             }
+            "econ-loop" => LevelsDiscriminants::EconLoop,
             _ => return Err(format!("Invalid level: {}", value)),
         })
     }

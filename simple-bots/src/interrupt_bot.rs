@@ -46,7 +46,7 @@ impl InterruptBot {
     ) -> DecisionResult {
         self.go_to_fent_if_seen(curr_pos, &in_progress_action)?;
 
-        self.seek_and_harvest_truffle(curr_pos, &in_progress_action, radar)?;
+        self.seek_and_pickup_truffle(curr_pos, &in_progress_action, radar)?;
 
         // If we have an in progress action, wait for it to complete
         if let Some(action) = in_progress_action {
@@ -92,7 +92,7 @@ impl InterruptBot {
         Continue
     }
 
-    fn seek_and_harvest_truffle(
+    fn seek_and_pickup_truffle(
         &mut self,
         curr_pos: Pos,
         in_progress_action: &Option<ActionWithId>,
@@ -102,8 +102,8 @@ impl InterruptBot {
         if let Some((dir, _)) =
             radar.find_dirs(CellStateRadar::has_item(Truffle))
         {
-            debug!(self, "Harvesting Truffle {dir:?}");
-            return Act(Action::Harvest(dir));
+            debug!(self, "Picking up Truffle {dir:?}");
+            return Act(Action::Pickup((Truffle, Some(dir))));
         }
 
         // Go to known Truffle location

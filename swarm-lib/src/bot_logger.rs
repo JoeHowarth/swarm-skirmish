@@ -387,6 +387,7 @@ pub fn format_radar(radar: &RadarData) -> String {
                         crate::Item::Crumb => ['C', ' '],   // Crumb
                         crate::Item::Fent => ['F', ' '],    // Fent
                         crate::Item::Truffle => ['T', ' '], // Truffle
+                        crate::Item::Metal => ['M', ' '], // Metal
                     }
                 } else {
                     [' ', ' '] // Empty space

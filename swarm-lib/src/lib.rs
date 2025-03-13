@@ -1,10 +1,10 @@
+#![allow(unused_imports)]
 #![feature(try_trait_v2)]
 
 use std::ops::{ControlFlow, FromResidual, Try};
 
 use bevy_ecs::component::Component;
 pub use bevy_math;
-use bevy_utils::HashMap;
 use bot_logger::BotLogger;
 
 pub mod bot_logger;
@@ -46,16 +46,6 @@ pub struct BotUpdate {
     pub completed_action: Option<ActionResult>,
 }
 
-pub fn is_true(b: &bool) -> bool {
-    *b
-}
-
-#[derive(Default, Debug, Clone)]
-pub struct Inventory(pub HashMap<Item, u32>);
-
-#[derive(Default, Debug, Clone)]
-pub struct Subsystems(pub HashMap<Subsystem, u8>);
-
 pub type ActionId = u32;
 
 #[derive(Debug, Clone)]
@@ -73,19 +63,107 @@ pub enum Action {
     Pickup((Item, Option<Dir>)),
     Drop((Item, Option<Dir>)),
     Transfer((Item, Dir)),
-    Build(Dir, BuildingKind),
-    Recharge,
+    Build(Dir, FrameKind, Subsystems),
+    Recharge(Dir),
     Attack(Dir),
 }
 
 #[derive(Default, Display, Copy, Clone, Debug)]
 pub enum FrameKind {
     #[default]
-    Basic,
+    Flea,
+    Tractor,
     Building(BuildingKind),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+impl BotData {
+    pub fn new(
+        frame_kind: FrameKind,
+        subsystems: Subsystems,
+        pos: Pos,
+        team: Team,
+    ) -> Self {
+        Self {
+            frame_kind,
+            subsystems,
+            energy: 100.into(),
+            inventory: Inventory::default(),
+            pos,
+            team,
+        }
+    }
+
+    pub fn max_energy(&self) -> Energy {
+        let base = match self.frame_kind {
+            FrameKind::Flea => 100,
+            FrameKind::Tractor => 100,
+            FrameKind::Building(BuildingKind::Small) => 100,
+        };
+
+        let power_cell_count =
+            *self.subsystems.get(&Subsystem::PowerCell).unwrap_or(&0) as u32;
+
+        Energy(base + power_cell_count * 100)
+    }
+
+    pub fn is_capable_of(&self, action: &Action) -> bool {
+        match action {
+            Action::Noop => true,
+            Action::MoveDir(_) | Action::MoveTo(_) => match self.frame_kind {
+                FrameKind::Flea => true,
+                FrameKind::Tractor => true,
+                FrameKind::Building(_building_kind) => false,
+            },
+            Action::Harvest(_dir) => {
+                self.subsystems.contains_key(&Subsystem::MiningDrill)
+            }
+            Action::Pickup(_) => {
+                self.subsystems.contains_key(&Subsystem::CargoBay)
+            }
+            Action::Drop(_) => {
+                self.subsystems.contains_key(&Subsystem::CargoBay)
+            }
+            Action::Transfer(_) => {
+                self.subsystems.contains_key(&Subsystem::CargoBay)
+            }
+            Action::Build(_dir, _frame_kind, _subsystems) => {
+                self.subsystems.contains_key(&Subsystem::Assembler)
+            }
+            Action::Recharge(_dir) => true,
+            Action::Attack(_dir) => {
+                self.subsystems.contains_key(&Subsystem::PlasmaRifle)
+            }
+        }
+    }
+}
+
+impl FrameKind {
+    pub const fn build_cost(&self) -> u32 {
+        match self {
+            FrameKind::Flea => 2,
+            FrameKind::Tractor => 5,
+            FrameKind::Building(BuildingKind::Small) => 7,
+        }
+    }
+
+    pub const fn slots(&self) -> u8 {
+        match self {
+            FrameKind::Flea => 1,
+            FrameKind::Tractor => 6,
+            FrameKind::Building(BuildingKind::Small) => 10,
+        }
+    }
+
+    pub fn is_building(&self) -> bool {
+        matches!(self, FrameKind::Building(_))
+    }
+
+    pub fn is_basic(&self) -> bool {
+        matches!(self, FrameKind::Flea)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Subsystem {
     PlasmaRifle,
     PowerCell,
@@ -94,10 +172,11 @@ pub enum Subsystem {
     OpticalTransciever,
     MiningDrill,
     Assembler,
+    Generator,
 }
 
 impl Subsystem {
-    pub fn slots_required(&self) -> u32 {
+    pub fn slots_required(&self) -> u8 {
         match self {
             Subsystem::PlasmaRifle => 1,
             Subsystem::PowerCell => 1,
@@ -106,14 +185,19 @@ impl Subsystem {
             Subsystem::OpticalTransciever => 2,
             Subsystem::MiningDrill => 3,
             Subsystem::Assembler => 5,
+            Subsystem::Generator => 5,
         }
+    }
+
+    pub fn build_cost(&self) -> u32 {
+        self.slots_required() as u32
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum BuildingKind {
     #[default]
-    Base,
+    Small,
 }
 
 impl Action {
@@ -126,8 +210,15 @@ impl Action {
             Action::Pickup(_) => Some(1),
             Action::Drop(_) => Some(1),
             Action::Transfer(_) => Some(1),
-            Action::Build(_, BuildingKind::Base) => None,
-            Action::Recharge => None,
+            Action::Build(_dir, frame_kind, subsystems) => {
+                let frame_kind_cost = frame_kind.build_cost();
+                let subsystems_cost: u32 = subsystems
+                    .iter()
+                    .map(|(s, num)| s.build_cost() * *num as u32)
+                    .sum();
+                Some(frame_kind_cost + subsystems_cost)
+            }
+            Action::Recharge(_dir) => None,
             Action::Attack(_) => Some(1),
         }
     }
@@ -141,8 +232,8 @@ impl Action {
             Action::Pickup(_) => 2.into(),
             Action::Drop(_) => 1.into(),
             Action::Transfer(_) => 2.into(),
-            Action::Build(_, BuildingKind::Base) => 2.into(),
-            Action::Recharge => 0.into(),
+            Action::Build(_dir, _frame_kind, _subsystems) => 2.into(),
+            Action::Recharge(_dir) => 0.into(),
             Action::Attack(_) => 4.into(),
         }
     }
