@@ -10,6 +10,7 @@ use swarm_lib::{
     Action::{self, *},
     BotData,
     CellKind,
+    FrameKind,
     Item,
     Pos,
     Team,
@@ -29,7 +30,7 @@ pub struct TilemapSystemSimUpdateSet;
 pub enum CellRender {
     Empty,
     Blocked,
-    Pawn(bool),
+    Pawn(bool, FrameKind),
     Item(Item),
 }
 
@@ -214,12 +215,14 @@ impl CellRender {
         TileTextureIndex(match self {
             CellRender::Empty => 0,
             CellRender::Blocked => 219,
-            CellRender::Pawn(true) => 1,
-            CellRender::Pawn(false) => 2,
+            CellRender::Pawn(true, FrameKind::Building(_)) => 9,
+            CellRender::Pawn(true, _) => 1,
+            CellRender::Pawn(false, FrameKind::Building(_)) => 10,
+            CellRender::Pawn(false, _) => 2,
             CellRender::Item(Item::Crumb) => 250,
             CellRender::Item(Item::Fent) => 239,
             CellRender::Item(Item::Truffle) => 84, // 'T' in ASCII
-            CellRender::Item(Item::Metal) => 109, // 'M' in ASCII
+            CellRender::Item(Item::Metal) => 109,  // 'M' in ASCII
         })
     }
 
@@ -228,8 +231,10 @@ impl CellRender {
         query: &Query<&BotData>,
     ) -> CellRender {
         if let Some(pawn_id) = state.pawn {
+            let bot_data = query.get(pawn_id).unwrap();
             return CellRender::Pawn(
-                query.get(pawn_id).unwrap().team == Team::Player,
+                bot_data.team == Team::Player,
+                bot_data.frame,
             );
         }
 

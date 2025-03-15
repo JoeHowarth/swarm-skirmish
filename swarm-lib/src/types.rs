@@ -3,32 +3,135 @@ use std::ops::{Add, Deref, DerefMut, Sub};
 use bevy_math::{IVec2, UVec2, Vec2};
 use bevy_utils::HashMap;
 use serde::{Deserialize, Serialize};
-use strum_macros::Display;
+use strum::{EnumCount, VariantArray};
+use strum_macros::{Display, FromRepr};
 
 use crate::Subsystem;
 
-#[derive(Default, Debug, Clone)]
-pub struct Inventory(pub HashMap<Item, u32>);
+#[derive(Debug, Clone)]
+pub struct Inventory {
+    pub items_table: U8Table<{ Item::COUNT as usize }, Item>,
+    pub capacity: u8,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct U8Table<const N: usize, T: EnumCount + From<u8> + Into<u8>> {
+    pub items_table: [u8; N],
+    pub capacity: u8,
+    _phantom: std::marker::PhantomData<T>,
+}
+
+impl<const N: usize, T: EnumCount + From<u8> + Into<u8> + Copy> U8Table<N, T> {
+    pub fn new(capacity: u8) -> Self {
+        U8Table {
+            items_table: [0; N],
+            capacity,
+            _phantom: std::marker::PhantomData,
+        }
+    }
+
+    pub fn has(&self, item: T) -> bool {
+        self.items_table[item.into() as usize] > 0
+    }
+
+    pub fn get(&self, item: T) -> u8 {
+        self.items_table[item.into() as usize]
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.size() == 0
+    }
+
+    pub fn size(&self) -> u8 {
+        self.items_table.iter().sum::<u8>()
+    }
+
+    pub fn set(&mut self, item: T, count: u8) -> bool {
+        let curr = self.get(item);
+        if self.size() - curr + count > self.capacity {
+            false
+        } else {
+            self.items_table[item.into() as usize] = curr + count;
+            true
+        }
+    }
+
+    pub fn add(&mut self, item: T, count: u8) -> bool {
+        if count > self.capacity {
+            false
+        } else {
+            self.items_table[item.into() as usize] += count;
+            true
+        }
+    }
+
+    /// Removes a specified amount of an item from the inventory.
+    /// Returns None if inventory contains fewer than count
+    /// otherwise returns Some(remaning)
+    pub fn remove(&mut self, item: T, count: u8) -> Option<u8> {
+        let curr = self.get(item);
+        if curr < count {
+            None
+        } else {
+            self.items_table[item.into() as usize] -= count;
+            Some(curr - count)
+        }
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (T, u8)> + use<'_, N, T> {
+        self.items_table
+            .iter()
+            .enumerate()
+            .filter(|(_, &count)| count > 0)
+            .map(|(item, &count)| (T::from(item as u8), count))
+    }
+}
+
+impl Inventory {
+    pub fn new(
+        capacity: u8,
+        items: impl IntoIterator<Item = (Item, u32)>,
+    ) -> Self {
+        let mut items_table = U8Table::new(capacity);
+        for (item, count) in items {
+            items_table.set(item, count as u8);
+        }
+        Inventory {
+            items_table,
+            capacity,
+        }
+    }
+}
 
 impl Deref for Inventory {
-    type Target = HashMap<Item, u32>;
+    type Target = U8Table<{ Item::COUNT as usize }, Item>;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.items_table
     }
 }
 
 impl DerefMut for Inventory {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        &mut self.items_table
     }
 }
 
-#[derive(Default, Debug, Clone)]
-pub struct Subsystems(pub HashMap<Subsystem, u8>);
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Subsystems(pub U8Table<{ Subsystem::COUNT as usize }, Subsystem>);
+
+impl Subsystems {
+    pub fn new(items: impl IntoIterator<Item = (Subsystem, u8)>) -> Self {
+        let mut subsystems = U8Table::new(Subsystem::COUNT as u8);
+        for (subsystem, count) in items {
+            subsystems.set(subsystem, count);
+        }
+        Subsystems(subsystems)
+    }
+}
 
 impl Deref for Subsystems {
-    type Target = HashMap<Subsystem, u8>;
+    type Target = U8Table<{ Subsystem::COUNT as usize }, Subsystem>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -87,12 +190,28 @@ pub enum CellKind {
     Serialize,
     Deserialize,
     strum_macros::Display,
+    strum_macros::EnumCount,
+    strum_macros::FromRepr,
+    strum_macros::VariantArray,
 )]
+#[repr(u8)]
 pub enum Item {
     Crumb,
     Fent,
     Truffle,
     Metal,
+}
+
+impl From<u8> for Item {
+    fn from(value: u8) -> Self {
+        Item::from_repr(value).unwrap()
+    }
+}
+
+impl From<Item> for u8 {
+    fn from(value: Item) -> Self {
+        value as u8
+    }
 }
 
 impl Dir {
@@ -223,6 +342,24 @@ impl std::fmt::Display for Energy {
 
 #[derive(Debug, Copy, Clone, Deserialize, Serialize, Eq, PartialEq)]
 pub struct Pos(pub (usize, usize));
+
+impl Pos {
+    pub fn manhattan_distance(&self, other: &Pos) -> usize {
+        let (x1, y1) = self.as_isize();
+        let (x2, y2) = other.as_isize();
+        (x1 - x2).abs() as usize + (y1 - y2).abs() as usize
+    }
+
+    pub fn is_adjacent(&self, other: &Pos) -> bool {
+        self.manhattan_distance(other) <= 1
+    }
+
+    pub fn dir_to(&self, other: &Pos) -> Option<Dir> {
+        let (x1, y1) = self.as_isize();
+        let (x2, y2) = other.as_isize();
+        Dir::from_deltas((x2 - x1, y2 - y1))
+    }
+}
 
 impl From<Pos> for Vec2 {
     fn from(val: Pos) -> Self {

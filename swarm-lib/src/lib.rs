@@ -1,5 +1,6 @@
 #![allow(unused_imports)]
 #![feature(try_trait_v2)]
+// #![feature(generic_const_exprs)]
 
 use std::ops::{ControlFlow, FromResidual, Try};
 
@@ -13,8 +14,9 @@ pub mod known_map;
 pub mod radar;
 pub mod types;
 
+use known_map::{ClientBotData, KnownMap};
 pub use radar::*;
-use strum_macros::Display;
+use strum_macros::{Display, EnumCount, EnumDiscriminants, FromRepr};
 pub use types::*;
 
 pub type NewBotNoMangeFn =
@@ -26,12 +28,14 @@ pub trait Bot: Sync + Send + 'static + std::fmt::Debug {
 
 #[derive(Debug, Clone, Component)]
 pub struct BotData {
-    pub frame_kind: FrameKind,
+    pub frame: FrameKind,
     pub subsystems: Subsystems,
     pub energy: Energy,
     pub inventory: Inventory,
     pub pos: Pos,
     pub team: Team,
+    pub known_map: KnownMap,
+    pub known_bots: Vec<ClientBotData>,
 }
 
 #[derive(Debug, Clone, Component)]
@@ -39,7 +43,6 @@ pub struct BotUpdate {
     pub tick: u32,
 
     pub bot_data: BotData,
-    pub radar: RadarData,
 
     // Result from previous action
     pub in_progress_action: Option<ActionWithId>,
@@ -54,7 +57,7 @@ pub struct ActionWithId {
     pub action: Action,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, EnumDiscriminants)]
 pub enum Action {
     Noop,
     MoveDir(Dir),
@@ -68,40 +71,46 @@ pub enum Action {
     Attack(Dir),
 }
 
-#[derive(Default, Display, Copy, Clone, Debug)]
-pub enum FrameKind {
-    #[default]
-    Flea,
-    Tractor,
-    Building(BuildingKind),
-}
-
 impl BotData {
     pub fn new(
         frame_kind: FrameKind,
         subsystems: Subsystems,
         pos: Pos,
         team: Team,
+        energy: Energy,
+        known_map: KnownMap,
+        known_bots: Vec<ClientBotData>,
     ) -> Self {
+        assert!(
+            subsystems.size() <= frame_kind.slots(),
+            "Subsystems require more slots than the frame kind has. Slots: \
+             {}, Subsystems: {}",
+            frame_kind.slots(),
+            subsystems.size()
+        );
         Self {
-            frame_kind,
+            frame: frame_kind,
+            energy,
+            inventory: Inventory::new(
+                subsystems.get(Subsystem::CargoBay) * 2,
+                [],
+            ),
             subsystems,
-            energy: 100.into(),
-            inventory: Inventory::default(),
             pos,
             team,
+            known_map,
+            known_bots,
         }
     }
 
     pub fn max_energy(&self) -> Energy {
-        let base = match self.frame_kind {
+        let base = match self.frame {
             FrameKind::Flea => 100,
             FrameKind::Tractor => 100,
-            FrameKind::Building(BuildingKind::Small) => 100,
+            FrameKind::Building(BuildingKind::Small) => 500,
         };
 
-        let power_cell_count =
-            *self.subsystems.get(&Subsystem::PowerCell).unwrap_or(&0) as u32;
+        let power_cell_count = self.subsystems.get(Subsystem::PowerCell) as u32;
 
         Energy(base + power_cell_count * 100)
     }
@@ -109,36 +118,36 @@ impl BotData {
     pub fn is_capable_of(&self, action: &Action) -> bool {
         match action {
             Action::Noop => true,
-            Action::MoveDir(_) | Action::MoveTo(_) => match self.frame_kind {
+            Action::MoveDir(_) | Action::MoveTo(_) => match self.frame {
                 FrameKind::Flea => true,
                 FrameKind::Tractor => true,
                 FrameKind::Building(_building_kind) => false,
             },
             Action::Harvest(_dir) => {
-                self.subsystems.contains_key(&Subsystem::MiningDrill)
+                self.subsystems.has(Subsystem::MiningDrill)
             }
-            Action::Pickup(_) => {
-                self.subsystems.contains_key(&Subsystem::CargoBay)
-            }
-            Action::Drop(_) => {
-                self.subsystems.contains_key(&Subsystem::CargoBay)
-            }
-            Action::Transfer(_) => {
-                self.subsystems.contains_key(&Subsystem::CargoBay)
-            }
+            Action::Pickup(_) => self.subsystems.has(Subsystem::CargoBay),
+            Action::Drop(_) => self.subsystems.has(Subsystem::CargoBay),
+            Action::Transfer(_) => self.subsystems.has(Subsystem::CargoBay),
             Action::Build(_dir, _frame_kind, _subsystems) => {
-                self.subsystems.contains_key(&Subsystem::Assembler)
+                self.subsystems.has(Subsystem::Assembler)
             }
             Action::Recharge(_dir) => true,
-            Action::Attack(_dir) => {
-                self.subsystems.contains_key(&Subsystem::PlasmaRifle)
-            }
+            Action::Attack(_dir) => self.subsystems.has(Subsystem::PlasmaRifle),
         }
     }
 }
 
+#[derive(Default, Display, Copy, Clone, Debug, PartialEq, Eq)]
+pub enum FrameKind {
+    #[default]
+    Flea,
+    Tractor,
+    Building(BuildingKind),
+}
+
 impl FrameKind {
-    pub const fn build_cost(&self) -> u32 {
+    pub const fn build_cost(&self) -> u8 {
         match self {
             FrameKind::Flea => 2,
             FrameKind::Tractor => 5,
@@ -163,7 +172,8 @@ impl FrameKind {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumCount, FromRepr)]
+#[repr(u8)]
 pub enum Subsystem {
     PlasmaRifle,
     PowerCell,
@@ -189,8 +199,20 @@ impl Subsystem {
         }
     }
 
-    pub fn build_cost(&self) -> u32 {
-        self.slots_required() as u32
+    pub fn build_cost(&self) -> u8 {
+        self.slots_required()
+    }
+}
+
+impl From<Subsystem> for u8 {
+    fn from(value: Subsystem) -> Self {
+        value as u8
+    }
+}
+
+impl From<u8> for Subsystem {
+    fn from(value: u8) -> Self {
+        Subsystem::from_repr(value).unwrap()
     }
 }
 
@@ -212,11 +234,11 @@ impl Action {
             Action::Transfer(_) => Some(1),
             Action::Build(_dir, frame_kind, subsystems) => {
                 let frame_kind_cost = frame_kind.build_cost();
-                let subsystems_cost: u32 = subsystems
+                let subsystems_cost: u8 = subsystems
                     .iter()
-                    .map(|(s, num)| s.build_cost() * *num as u32)
+                    .map(|(s, num)| s.build_cost() * num)
                     .sum();
-                Some(frame_kind_cost + subsystems_cost)
+                Some((frame_kind_cost + subsystems_cost) as u32)
             }
             Action::Recharge(_dir) => None,
             Action::Attack(_) => Some(1),
@@ -275,6 +297,18 @@ pub enum DecisionResult {
     Wait,
     /// Perform a new action
     Act(Action),
+}
+
+impl DecisionResult {
+    pub fn or_continue(
+        self,
+        next: impl FnOnce() -> DecisionResult,
+    ) -> DecisionResult {
+        match self {
+            DecisionResult::Continue => next(),
+            _ => self,
+        }
+    }
 }
 
 impl Try for DecisionResult {

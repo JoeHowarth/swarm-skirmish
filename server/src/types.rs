@@ -31,6 +31,7 @@ pub struct PartiallyBuiltBot {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct CellState {
     pub kind: CellKind,
+    pub partially_built_bot: Option<Entity>,
     pub pawn: Option<Entity>,
     pub item: Option<Item>,
 }

@@ -1,7 +1,5 @@
-#![allow(unused_imports)]
+#![allow(unused_imports, dead_code)]
 
-use crumb_follower::CrumbFollower;
-use interrupt_bot::InterruptBot;
 use rand::{rngs::SmallRng, SeedableRng};
 use swarm_lib::{
     bot_logger::BotLogger,
@@ -13,8 +11,8 @@ use swarm_lib::{
     NewBotNoMangeFn,
 };
 
-mod crumb_follower;
-mod interrupt_bot;
+mod econ_bot;
+mod old;
 
 #[no_mangle]
 pub fn test_fn() -> String {
@@ -23,11 +21,11 @@ pub fn test_fn() -> String {
 
 #[no_mangle]
 pub fn new_bot(ctx: BotLogger, (map_w, map_h): (usize, usize)) -> Box<dyn Bot> {
-    Box::new(InterruptBot {
+    Box::new(econ_bot::EconBot {
+        role: econ_bot::EconBotRole::default(),
         grid: GridWorld::new(map_w, map_h, ClientCellState::default()),
         rng: SmallRng::seed_from_u64(ctx.bot_id as u64),
         ctx,
-        default_dir: Dir::Up,
         action_counter: 0,
         seen_bots: Vec::new(),
     })

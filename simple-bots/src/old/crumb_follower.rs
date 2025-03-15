@@ -1,8 +1,8 @@
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use swarm_lib::{
     bot_logger::BotLogger,
-    gridworld::GridWorld,
-    known_map::{update_known_map, ClientBotData, ClientCellState},
+    gridworld::{GridWorld, PassableCell},
+    known_map::{ClientBotData, ClientCellState, KnownMap},
     Action,
     ActionWithId,
     Bot,
@@ -10,39 +10,19 @@ use swarm_lib::{
     CellKind,
     CellStateRadar,
     Dir,
-    Item::*,
+    Item::{self, *},
     NewBotNoMangeFn,
     Pos,
     RadarData,
 };
 
-#[no_mangle]
-pub fn test_fn() -> String {
-    "Hello, world!".to_string()
-}
-
-#[no_mangle]
-pub fn new_bot(ctx: BotLogger, (map_w, map_h): (usize, usize)) -> Box<dyn Bot> {
-    Box::new(CrumbFollower {
-        grid: GridWorld::new(map_w, map_h, ClientCellState::default()),
-        rng: SmallRng::seed_from_u64(ctx.bot_id as u64),
-        ctx,
-        default_dir: Dir::Up,
-        action_counter: 0,
-        seen_bots: Vec::new(),
-    })
-}
-
-/// Type check
-static _X: NewBotNoMangeFn = new_bot;
-
 pub struct CrumbFollower {
-    ctx: BotLogger,
-    rng: SmallRng,
-    default_dir: Dir,
-    action_counter: u32,
-    grid: GridWorld<ClientCellState>,
-    seen_bots: Vec<ClientBotData>,
+    pub ctx: BotLogger,
+    pub rng: SmallRng,
+    pub default_dir: Dir,
+    pub action_counter: u32,
+    // pub grid: GridWorld<ClientCellState>,
+    pub seen_bots: Vec<ClientBotData>,
 }
 
 use std::fmt;
@@ -52,7 +32,6 @@ impl fmt::Debug for CrumbFollower {
         f.debug_struct("CrumbFollower")
             .field("action_counter", &self.action_counter)
             .field("default_dir", &self.default_dir)
-            .field("grid_size", &(self.grid.width(), self.grid.height()))
             .field("seen_bots_count", &self.seen_bots.len())
             .finish()
     }
@@ -64,16 +43,16 @@ impl CrumbFollower {
     fn determine_next_action(
         &mut self,
         curr_pos: Pos,
-        radar: &RadarData,
+        map: &KnownMap,
         tick: u32,
     ) -> Action {
         // Go to known Fent location
         if let Some((pos, cell)) =
-            self.grid.iter().find(|(_, cell)| cell.item == Some(Fent))
+            map.iter().find(|(_, cell)| cell.item == Some(Fent))
         {
             let pos = Pos::from((pos.0, pos.1));
 
-            if let Some(path) = self.grid.find_path(curr_pos, pos) {
+            if let Some(path) = map.find_path(curr_pos, pos) {
                 self.ctx.debug(format!(
                     "Going to Fent at position: {}. Last observed {}, {} \
                      ticks ago, current pos: {}",
@@ -89,20 +68,17 @@ impl CrumbFollower {
         }
 
         // Harvest nearby Truffle
-        if let Some((dir, _)) =
-            radar.find_dirs(CellStateRadar::has_item(Truffle))
+        if let Some(dir) =
+            map.find_adj(curr_pos, CellStateRadar::has_item(Truffle))
         {
             self.ctx.debug(format!("Harvesting Truffle {dir:?}"));
             return Action::Harvest(dir);
         }
 
         // Go to known Truffle location
-        if let Some((pos, cell)) = self
-            .grid
-            .iter()
-            .find(|(_, cell)| cell.item == Some(Truffle))
+        if let Some((pos, cell)) =
+            map.find_nearby(curr_pos, 1000, |cell| cell.item == Some(Truffle))
         {
-            let pos = Pos::from((pos.0 + 1, pos.1));
             self.ctx.debug(format!(
                 "Going to truffle at position: {}. Last observed {}, {} ticks \
                  ago, current pos: {}",
@@ -112,56 +88,51 @@ impl CrumbFollower {
                 curr_pos
             ));
 
-            if let Some(path) = self.grid.find_path(curr_pos, pos) {
-                return Action::MoveTo(path.into_iter().collect());
+            if let Some(path) = map.find_path_adj(curr_pos, pos) {
+                return Action::MoveTo(path);
             }
 
             self.ctx.debug("No path to truffle");
         }
 
         // Follow Crumb
-        if let Some((_, cell)) = radar.find(CellStateRadar::has_item(Crumb)) {
+        if let Some((pos, _)) =
+            map.find_nearby(curr_pos, 1000, CellStateRadar::has_item(Crumb))
+        {
             self.ctx
-                .debug(format!("Found Crumb at world position: {}", cell.pos));
+                .debug(format!("Found Crumb at world position: {}", pos));
 
-            if let Some(path) = self.grid.find_path(curr_pos, cell.pos) {
-                return Action::MoveTo(path.into_iter().collect());
+            if let Some(path) = map.find_path(curr_pos, pos) {
+                return Action::MoveTo(path);
             }
 
             self.ctx.debug("No path to crumb");
         }
 
         // Explore random unknown cells
-        let unknown_cells: Vec<_> = self
-            .grid
-            .iter()
-            .filter(|(_, cell)| cell.kind == CellKind::Unknown)
-            .collect();
+        let unknown_cells =
+            map.find_nearby(curr_pos, 1000, |cell| cell.is_unknown());
 
-        if !unknown_cells.is_empty() {
-            let random_index = self.rng.random_range(0..unknown_cells.len());
-            let (pos, _) = unknown_cells[random_index];
-
+        if let Some((pos, _)) = unknown_cells {
             self.ctx.debug(format!(
                 "Found random unexplored cell at position: {}",
                 Pos::from(pos)
             ));
 
-            if let Some(path) = self.grid.find_path(curr_pos, pos) {
-                return Action::MoveTo(path.into_iter().collect());
+            if let Some(path) = map.find_path(curr_pos, pos) {
+                return Action::MoveTo(path);
             }
 
             self.ctx.debug("No path to random unexplored cell");
         }
 
         // Random movement if nothing else to do
-        if self.rng.random_bool(0.2)
-            || radar
-                .get_dir(self.default_dir)
-                .map(|cell| cell.kind)
-                .unwrap_or(CellKind::Blocked)
-                == CellKind::Blocked
-        {
+        let default_dir_blocked = (curr_pos + self.default_dir)
+            .and_then(|p| map.try_get(p))
+            .map(|c| c.is_blocked())
+            .unwrap_or(true);
+
+        if self.rng.random_bool(0.2) || default_dir_blocked {
             self.ctx.debug("Changing default dir");
             self.default_dir =
                 Dir::from_repr(self.rng.random_range(0..=3)).unwrap();
@@ -178,13 +149,6 @@ impl Bot for CrumbFollower {
         self.ctx.set_tick(update.tick);
         self.ctx.log_debug_info(&update, 1);
 
-        update_known_map(
-            &mut self.grid,
-            &mut self.seen_bots,
-            &update.radar,
-            update.tick,
-        );
-
         if let Some(action) = update.in_progress_action {
             self.ctx.debug(format!(
                 "Previous action still in progress, waiting... Action: \
@@ -196,7 +160,7 @@ impl Bot for CrumbFollower {
         // Determine the next action using a linear decision flow
         let action = self.determine_next_action(
             update.bot_data.pos,
-            &update.radar,
+            &update.bot_data.known_map,
             update.tick,
         );
 

@@ -4,6 +4,7 @@ use rand::{prelude::SliceRandom, Rng};
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumDiscriminants;
 use swarm_lib::{
+    known_map::{ClientCellState, KnownMap},
     BotData,
     BuildingKind,
     Energy,
@@ -31,10 +32,10 @@ use crate::{
     description = "Scenario to test economic loop"
 )]
 pub struct EconLoopArgs {
-    #[argh(option, default = "20")]
+    #[argh(option, default = "100")]
     /// the width of the map
     pub width: usize,
-    #[argh(option, default = "20")]
+    #[argh(option, default = "100")]
     /// the height of the map
     pub height: usize,
 }
@@ -54,19 +55,19 @@ pub(super) fn init_econ_loop(mut commands: Commands, level_args: Res<Levels>) {
     // Add a border of Blocked cells around the edge of the grid
     for x in 0..width {
         // Top and bottom borders
-        grid_world.set(x, 0, CellState::blocked());
-        grid_world.set(x, height - 1, CellState::blocked());
+        grid_world.set_tuple(x, 0, CellState::blocked());
+        grid_world.set_tuple(x, height - 1, CellState::blocked());
     }
 
     for y in 0..height {
         // Left and right borders
-        grid_world.set(0, y, CellState::blocked());
-        grid_world.set(width - 1, y, CellState::blocked());
+        grid_world.set_tuple(0, y, CellState::blocked());
+        grid_world.set_tuple(width - 1, y, CellState::blocked());
     }
 
     // Generate 5 sets of contiguous wall segments
     for _ in 0..5 {
-        let segment_length = rng.random_range(2..=20);
+        let segment_length = rng.random_range(5..=20);
         let start_x = rng.random_range(2..width - 2);
         let start_y = rng.random_range(2..height - 2);
 
@@ -88,7 +89,7 @@ pub(super) fn init_econ_loop(mut commands: Commands, level_args: Res<Levels>) {
                 && wall_y >= 1
                 && wall_y < height - 1
             {
-                grid_world.set(wall_x, wall_y, CellState::blocked());
+                grid_world.set_tuple(wall_x, wall_y, CellState::blocked());
             }
         }
     }
@@ -99,7 +100,7 @@ pub(super) fn init_econ_loop(mut commands: Commands, level_args: Res<Levels>) {
             let x = rng.random_range(1..width - 1);
             let y = rng.random_range(1..height - 1);
 
-            let cell = grid.get(x, y);
+            let cell = grid.get_tuple(x, y);
             if cell.can_enter() && cell.pawn.is_none() && cell.item.is_none() {
                 return (x, y);
             }
@@ -112,25 +113,31 @@ pub(super) fn init_econ_loop(mut commands: Commands, level_args: Res<Levels>) {
     // Place first bot
     let (bot1_x, bot1_y) = find_empty_cell(&grid_world);
     let bot1 = commands
-        .spawn(BotData {
-            frame_kind: FrameKind::Building(BuildingKind::Small),
-            team,
-            energy: Energy(400),
-            pos: Pos((bot1_x, bot1_y)),
-            inventory: Inventory(HashMap::from([(Item::Metal, 10)])),
-            subsystems: Subsystems(HashMap::from([
-                (Subsystem::Assembler, 1),
-                (Subsystem::CargoBay, 2),
-                (Subsystem::PowerCell, 3),
-            ])),
+        .spawn({
+            let mut bot_data = BotData::new(
+                FrameKind::Building(BuildingKind::Small),
+                Subsystems::new([
+                    (Subsystem::Assembler, 1),
+                    (Subsystem::CargoBay, 3),
+                    (Subsystem::PowerCell, 2),
+                ]),
+                Pos((bot1_x, bot1_y)),
+                team,
+                Energy(1),
+                KnownMap::new(width, height, ClientCellState::default()),
+                Vec::new(),
+            );
+            bot_data.inventory.add(Item::Metal, 6);
+            bot_data.energy = bot_data.max_energy();
+            bot_data
         })
         .id();
-    grid_world.set(bot1_x, bot1_y, CellState::new_with_pawn(bot1));
+    grid_world.set_tuple(bot1_x, bot1_y, CellState::new_with_pawn(bot1));
 
-    // Place 200 metal items
-    for _ in 0..200 {
+    // Place metal items
+    for _ in 0..20.min(width * height / 20) {
         let (x, y) = find_empty_cell(&grid_world);
-        grid_world.get_mut(x, y).item = Some(Item::Metal);
+        grid_world.get_tuple_mut(x, y).item = Some(Item::Metal);
     }
 
     commands.insert_resource(grid_world);

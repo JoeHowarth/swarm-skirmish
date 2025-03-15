@@ -8,6 +8,8 @@ swarm-lib = { path = "../swarm-lib" }
 eyre = "0.6"
 rand = { version = "0.9", features = ["small_rng"] }
 serde = { workspace = true }
+strum = "0.27"
+strum_macros = "0.27"
 
 [lib]
 crate-type = ["dylib"]

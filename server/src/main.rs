@@ -71,10 +71,21 @@ use dlopen2::wrapper::{Container, WrapperApi};
 fn main() {
     let args: Args = argh::from_env();
 
+    let scale = 9.0;
+    let res = match &args.level {
+        Some(Levels::EconLoop(args)) => {
+            (args.width as f32 * scale, args.height as f32 * scale)
+        }
+        Some(Levels::RandomCrumbsAndTruffles(args)) => {
+            (args.width as f32 * scale, args.height as f32 * scale)
+        }
+        _ => (500.0, 500.0),
+    };
+
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                resolution: (500.0, 500.0).into(),
+                resolution: res.into(),
                 ..default()
             }),
             ..default()
@@ -165,16 +176,12 @@ fn check_win_condition(
         return;
     }
     for (bot_id, bot_data) in query.iter() {
-        let Some(&amt) = bot_data.inventory.0.get(&Item::Fent) else {
-            continue;
-        };
+        let amt = bot_data.inventory.get(Item::Fent);
         if amt == 0 {
             continue;
         }
 
-        let Some(&amt) = bot_data.inventory.0.get(&Item::Truffle) else {
-            continue;
-        };
+        let amt = bot_data.inventory.get(Item::Truffle);
         if amt < 2 {
             continue;
         }

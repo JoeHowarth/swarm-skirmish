@@ -4,6 +4,7 @@ use rand::{prelude::SliceRandom, Rng};
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumDiscriminants;
 use swarm_lib::{
+    known_map::{ClientCellState, KnownMap},
     BotData,
     Energy,
     FrameKind,
@@ -56,14 +57,14 @@ pub(super) fn init_random_crumbs_and_truffles(
     // Add a border of Blocked cells around the edge of the grid
     for x in 0..width {
         // Top and bottom borders
-        grid_world.set(x, 0, CellState::blocked());
-        grid_world.set(x, height - 1, CellState::blocked());
+        grid_world.set_tuple(x, 0, CellState::blocked());
+        grid_world.set_tuple(x, height - 1, CellState::blocked());
     }
 
     for y in 0..height {
         // Left and right borders
-        grid_world.set(0, y, CellState::blocked());
-        grid_world.set(width - 1, y, CellState::blocked());
+        grid_world.set_tuple(0, y, CellState::blocked());
+        grid_world.set_tuple(width - 1, y, CellState::blocked());
     }
 
     // Generate 5 sets of contiguous wall segments
@@ -90,7 +91,7 @@ pub(super) fn init_random_crumbs_and_truffles(
                 && wall_y >= 1
                 && wall_y < height - 1
             {
-                grid_world.set(wall_x, wall_y, CellState::blocked());
+                grid_world.set_tuple(wall_x, wall_y, CellState::blocked());
             }
         }
     }
@@ -101,7 +102,7 @@ pub(super) fn init_random_crumbs_and_truffles(
             let x = rng.random_range(1..width - 1);
             let y = rng.random_range(1..height - 1);
 
-            let cell = grid.get(x, y);
+            let cell = grid.get_tuple(x, y);
             if cell.can_enter() && cell.pawn.is_none() && cell.item.is_none() {
                 return (x, y);
             }
@@ -114,49 +115,43 @@ pub(super) fn init_random_crumbs_and_truffles(
     // Place first bot
     let (bot1_x, bot1_y) = find_empty_cell(&grid_world);
     let bot1 = commands
-        .spawn(BotData {
-            frame_kind: FrameKind::default(),
+        .spawn(BotData::new(
+            FrameKind::default(),
+            Subsystems::new([(Subsystem::CargoBay, 1)]),
+            Pos((bot1_x, bot1_y)),
             team,
-            energy: Energy(100),
-            pos: Pos((bot1_x, bot1_y)),
-            inventory: Inventory::default(),
-            subsystems: {
-                let mut subsystems = Subsystems::default();
-                subsystems.insert(Subsystem::CargoBay, 1);
-                subsystems
-            },
-        })
+            Energy(100),
+            KnownMap::new(width, height, ClientCellState::default()),
+            Vec::new(),
+        ))
         .id();
-    grid_world.set(bot1_x, bot1_y, CellState::new_with_pawn(bot1));
+    grid_world.set_tuple(bot1_x, bot1_y, CellState::new_with_pawn(bot1));
 
     // Place second bot
     let (bot2_x, bot2_y) = find_empty_cell(&grid_world);
     let bot2 = commands
-        .spawn(BotData {
-            frame_kind: FrameKind::default(),
+        .spawn(BotData::new(
+            FrameKind::default(),
+            Subsystems::new([(Subsystem::CargoBay, 1)]),
+            Pos((bot2_x, bot2_y)),
             team,
-            energy: Energy(100),
-            pos: Pos((bot2_x, bot2_y)),
-            inventory: Inventory::default(),
-            subsystems: {
-                let mut subsystems = Subsystems::default();
-                subsystems.insert(Subsystem::CargoBay, 1);
-                subsystems
-            },
-        })
+            Energy(100),
+            KnownMap::new(width, height, ClientCellState::default()),
+            Vec::new(),
+        ))
         .id();
-    grid_world.set(bot2_x, bot2_y, CellState::new_with_pawn(bot2));
+    grid_world.set_tuple(bot2_x, bot2_y, CellState::new_with_pawn(bot2));
 
     // Place 2 Fent items
     for _ in 0..2 {
         let (x, y) = find_empty_cell(&grid_world);
-        grid_world.get_mut(x, y).item = Some(Item::Fent);
+        grid_world.get_tuple_mut(x, y).item = Some(Item::Fent);
     }
 
     // Place 3 Truffle items
     for _ in 0..3 {
         let (x, y) = find_empty_cell(&grid_world);
-        grid_world.get_mut(x, y).item = Some(Item::Truffle);
+        grid_world.get_tuple_mut(x, y).item = Some(Item::Truffle);
     }
 
     commands.insert_resource(grid_world);

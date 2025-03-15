@@ -1,14 +1,16 @@
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
-use crate::{CellKind, Dir, Item, Pos, Team};
+use crate::{known_map::ClientCellState, CellKind, Dir, FrameKind, Item, Pos, Subsystems, Team};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct RadarBotData {
     pub bot_id: u32,
     pub team: Team,
     /// World coordinates
     pub pos: Pos,
+    pub frame: FrameKind,
+    pub subsystems: Subsystems,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -22,7 +24,7 @@ pub struct CellStateRadar {
     pub pos: Pos, // Added world position to each cell
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct RadarData {
     pub center_world_pos: Pos,
     pub pawns: Vec<RadarBotData>,
@@ -32,7 +34,7 @@ pub struct RadarData {
 }
 
 impl CellStateRadar {
-    pub fn has_item(item: Item) -> impl Fn(&CellStateRadar) -> bool + Copy {
+    pub fn has_item(item: Item) -> impl Fn(&ClientCellState) -> bool + Copy {
         move |cell| cell.item == Some(item)
     }
 }

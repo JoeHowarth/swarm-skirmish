@@ -4,15 +4,14 @@ use rand::{rngs::SmallRng, Rng, SeedableRng};
 use swarm_lib::{
     bot_logger::BotLogger,
     gridworld::GridWorld,
-    known_map::{update_known_map, ClientBotData, ClientCellState},
+    known_map::{ClientBotData, ClientCellState, KnownMap},
     Action,
     ActionWithId,
     Bot,
     BotUpdate,
     CellKind,
     CellStateRadar,
-    DecisionResult,
-    DecisionResult::{Act, Continue, Wait},
+    DecisionResult::{self, Act, Continue, Wait},
     Dir,
     Item::{self, *},
     NewBotNoMangeFn,
@@ -25,7 +24,7 @@ pub struct InterruptBot {
     pub rng: SmallRng,
     pub default_dir: Dir,
     pub action_counter: u32,
-    pub grid: GridWorld<ClientCellState>,
+    // pub grid: GridWorld<ClientCellState>,
     pub seen_bots: Vec<ClientBotData>,
 }
 
@@ -41,12 +40,12 @@ impl InterruptBot {
     fn determine_next_action(
         &mut self,
         curr_pos: Pos,
-        radar: &RadarData,
+        known_map: &KnownMap,
         in_progress_action: Option<ActionWithId>,
     ) -> DecisionResult {
-        self.go_to_fent_if_seen(curr_pos, &in_progress_action)?;
+        self.go_to_fent_if_seen(curr_pos, known_map, &in_progress_action)?;
 
-        self.seek_and_pickup_truffle(curr_pos, &in_progress_action, radar)?;
+        self.seek_and_pickup_truffle(curr_pos, &in_progress_action, known_map)?;
 
         // If we have an in progress action, wait for it to complete
         if let Some(action) = in_progress_action {
@@ -63,24 +62,25 @@ impl InterruptBot {
             return Wait;
         }
 
-        self.follow_crumbs(curr_pos, radar)?;
+        self.follow_crumbs(curr_pos, known_map)?;
 
         // Explore random unknown cells
-        self.explore_unknown_cells(curr_pos, radar)
+        self.explore_unknown_cells(curr_pos, known_map)
     }
 
     fn go_to_fent_if_seen(
         &mut self,
         curr_pos: Pos,
+        known_map: &KnownMap,
         in_progress_action: &Option<ActionWithId>,
     ) -> DecisionResult {
         if let Some((pos, _cell)) =
-            self.grid.iter().find(|(_, cell)| cell.item == Some(Fent))
+            known_map.iter().find(|(_, cell)| cell.item == Some(Fent))
         {
             let pos = Pos::from((pos.0, pos.1));
             existing_path_contains_pos(in_progress_action, pos, &mut self.ctx)?;
 
-            if let Some(path) = self.grid.find_path(curr_pos, pos) {
+            if let Some(path) = known_map.find_path(curr_pos, pos) {
                 debug!(self, "Going to Fent at position: {pos}");
 
                 return Act(Action::MoveTo(path.into_iter().collect()));
@@ -96,28 +96,26 @@ impl InterruptBot {
         &mut self,
         curr_pos: Pos,
         in_progress_action: &Option<ActionWithId>,
-        radar: &RadarData,
+        radar: &KnownMap,
     ) -> DecisionResult {
         // Harvest nearby Truffle
-        if let Some((dir, _)) =
-            radar.find_dirs(CellStateRadar::has_item(Truffle))
+        if let Some(dir) =
+            radar.find_adj(curr_pos, |cell| cell.item == Some(Truffle))
         {
             debug!(self, "Picking up Truffle {dir:?}");
             return Act(Action::Pickup((Truffle, Some(dir))));
         }
 
         // Go to known Truffle location
-        if let Some((pos, _cell)) = self
-            .grid
-            .iter()
-            .find(|(_, cell)| cell.item == Some(Truffle))
+        if let Some((pos, _cell)) =
+            radar.iter().find(|(_, cell)| cell.item == Some(Truffle))
         {
             let pos = Pos::from((pos.0 + 1, pos.1));
             existing_path_contains_pos(in_progress_action, pos, &mut self.ctx)?;
 
             debug!(self, "Going to truffle at position: {pos}");
 
-            if let Some(path) = self.grid.find_path(curr_pos, pos) {
+            if let Some(path) = radar.find_path(curr_pos, pos) {
                 return Act(Action::MoveTo(path.into_iter().collect()));
             }
 
@@ -130,16 +128,19 @@ impl InterruptBot {
     fn follow_crumbs(
         &mut self,
         curr_pos: Pos,
-        radar: &RadarData,
+        known_map: &KnownMap,
     ) -> DecisionResult {
-        let Some((_, cell)) = radar.find(CellStateRadar::has_item(Crumb))
-        else {
+        let Some((pos, _)) = known_map.find_nearby(
+            curr_pos,
+            1000,
+            CellStateRadar::has_item(Crumb),
+        ) else {
             return Continue;
         };
 
-        debug!(self, "Found Crumb at world position: {}", cell.pos);
+        debug!(self, "Found Crumb at world position: {pos}");
 
-        if let Some(path) = self.grid.find_path(curr_pos, cell.pos) {
+        if let Some(path) = known_map.find_path(curr_pos, pos) {
             return Act(Action::MoveTo(path.into_iter().collect()));
         }
 
@@ -151,10 +152,9 @@ impl InterruptBot {
     fn explore_unknown_cells(
         &mut self,
         curr_pos: Pos,
-        radar: &RadarData,
+        radar: &KnownMap,
     ) -> DecisionResult {
-        let unknown_cells: Vec<_> = self
-            .grid
+        let unknown_cells: Vec<_> = radar
             .iter()
             .filter(|(_, cell)| cell.kind == CellKind::Unknown)
             .collect();
@@ -165,7 +165,7 @@ impl InterruptBot {
 
             debug!(self, "Found random unexplored cell at position: {pos:?}");
 
-            if let Some(path) = self.grid.find_path(curr_pos, pos) {
+            if let Some(path) = radar.find_path(curr_pos, pos) {
                 return Act(Action::MoveTo(path.into_iter().collect()));
             }
 
@@ -175,13 +175,13 @@ impl InterruptBot {
         debug!(self, "No unexplored cells found, moving exploring randomly");
 
         // Random movement if nothing else to do
-        if self.rng.random_bool(0.2)
-            || radar
-                .get_dir(self.default_dir)
-                .map(|cell| cell.kind)
-                .unwrap_or(CellKind::Blocked)
-                == CellKind::Blocked
-        {
+        let default_dir_blocked = (curr_pos + self.default_dir)
+            .and_then(|p| radar.try_get(p))
+            .map(|c| c.kind)
+            .unwrap_or(CellKind::Blocked)
+            == CellKind::Blocked;
+
+        if self.rng.random_bool(0.2) || default_dir_blocked {
             debug!(self, "Changing default dir");
             self.default_dir =
                 Dir::from_repr(self.rng.random_range(0..=3)).unwrap();
@@ -196,17 +196,10 @@ impl Bot for InterruptBot {
         self.ctx.set_tick(update.tick);
         self.ctx.log_debug_info(&update, 1);
 
-        update_known_map(
-            &mut self.grid,
-            &mut self.seen_bots,
-            &update.radar,
-            update.tick,
-        );
-
         // Determine the next action using a linear decision flow
         let action = self.determine_next_action(
             update.bot_data.pos,
-            &update.radar,
+            &update.bot_data.known_map,
             update.in_progress_action,
         );
 
@@ -230,7 +223,6 @@ impl fmt::Debug for InterruptBot {
         f.debug_struct("InterruptBot")
             .field("action_counter", &self.action_counter)
             .field("default_dir", &self.default_dir)
-            .field("grid_size", &(self.grid.width(), self.grid.height()))
             .field("seen_bots_count", &self.seen_bots.len())
             .finish()
     }
