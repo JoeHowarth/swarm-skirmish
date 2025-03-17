@@ -2,7 +2,7 @@
 #![feature(mpmc_channel)]
 #![feature(arbitrary_self_types)]
 
-use core::{CorePlugin, CoreSystemsSet};
+use core::{should_tick, CorePlugin, CoreSystemsSet, TickSpeed};
 use std::{
     sync::{Arc, LazyLock, OnceLock, RwLock},
     time::Duration,
@@ -11,12 +11,14 @@ use std::{
 use apply_actions::{ActionsPlugin, ActionsSystemSet};
 use argh::{FromArgValue, FromArgs};
 use bevy::{
+    color::palettes::css,
     prelude::*,
     state::state::FreelyMutableState,
     time::common_conditions::on_timer,
     utils::HashMap,
 };
 use bot_update::{BotId, BotUpdatePlugin, BotUpdateSystemSet};
+use graphics::{tilemap::TilemapSystemSimUpdateSet, GraphicsSystemSet};
 use levels::{Levels, LevelsDiscriminants, LevelsPlugin};
 use serde::{Deserialize, Serialize};
 use strum::IntoDiscriminant;
@@ -30,14 +32,13 @@ use swarm_lib::{
     Pos,
     Team,
 };
-use tilemap::TilemapSystemSimUpdateSet;
 use types::{CellState, GridWorld};
 
 mod apply_actions;
 mod bot_update;
 mod core;
+mod graphics;
 mod levels;
-mod tilemap;
 mod types;
 
 static MAP_SIZE: LazyLock<RwLock<Option<(usize, usize)>>> =
@@ -96,7 +97,7 @@ fn main() {
             bevy_pancam::PanCamPlugin,
         ))
         .add_plugins((
-            tilemap::TilemapPlugin,
+            graphics::GraphicsPlugin,
             ActionsPlugin,
             CorePlugin,
             LevelsPlugin,
@@ -110,6 +111,10 @@ fn main() {
         )
         .insert_resource(args.level.unwrap_or_default())
         .insert_state(GameState::Idle)
+        .insert_resource(TickSpeed {
+            ms: args.tick_ms,
+            is_paused: false,
+        })
         .add_systems(Startup, camera_setup)
         .add_systems(
             OnExit(GameState::InGame),
@@ -122,14 +127,14 @@ fn main() {
         .configure_sets(
             Update,
             (
+                CoreSystemsSet,
                 BotUpdateSystemSet,
                 ActionsSystemSet,
-                CoreSystemsSet,
-                TilemapSystemSimUpdateSet,
+                GraphicsSystemSet,
             )
                 .chain()
                 .run_if(in_state(GameState::InGame))
-                .run_if(on_timer(Duration::from_millis(args.tick_ms))),
+                .run_if(should_tick),
         )
         .add_systems(Update, (exit_system, check_win_condition, display_win_ui))
         .run();
@@ -150,6 +155,21 @@ pub fn camera_setup(mut commands: Commands) {
             grab_buttons: vec![MouseButton::Right, MouseButton::Left],
             min_scale: 0.25,
             max_scale: 5.0,
+            ..default()
+        },
+    ));
+
+    commands.spawn((
+        Text::new("Main Text"),
+        TextColor(css::RED.into()),
+        Node {
+            position_type: PositionType::Absolute,
+            right: Val::Px(0.0),
+            top: Val::Px(0.0),
+            ..default()
+        },
+        TextFont {
+            font_size: 20.0,
             ..default()
         },
     ));

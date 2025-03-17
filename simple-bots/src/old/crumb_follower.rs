@@ -45,7 +45,7 @@ impl CrumbFollower {
         curr_pos: Pos,
         map: &KnownMap,
         tick: u32,
-    ) -> Action {
+    ) -> (Action, &'static str) {
         // Go to known Fent location
         if let Some((pos, cell)) =
             map.iter().find(|(_, cell)| cell.item == Some(Fent))
@@ -61,7 +61,7 @@ impl CrumbFollower {
                     tick - cell.last_observed,
                     curr_pos
                 ));
-                return Action::MoveTo(path.into_iter().collect());
+                return (Action::MoveTo(path), "Going to Fent");
             }
 
             self.ctx.debug("No path to Fent");
@@ -72,7 +72,7 @@ impl CrumbFollower {
             map.find_adj(curr_pos, CellStateRadar::has_item(Truffle))
         {
             self.ctx.debug(format!("Harvesting Truffle {dir:?}"));
-            return Action::Harvest(dir);
+            return (Action::Harvest(dir), "Harvesting Truffle");
         }
 
         // Go to known Truffle location
@@ -89,7 +89,7 @@ impl CrumbFollower {
             ));
 
             if let Some(path) = map.find_path_adj(curr_pos, pos) {
-                return Action::MoveTo(path);
+                return (Action::MoveTo(path), "Going to truffle");
             }
 
             self.ctx.debug("No path to truffle");
@@ -103,7 +103,7 @@ impl CrumbFollower {
                 .debug(format!("Found Crumb at world position: {}", pos));
 
             if let Some(path) = map.find_path(curr_pos, pos) {
-                return Action::MoveTo(path);
+                return (Action::MoveTo(path), "Following crumbs");
             }
 
             self.ctx.debug("No path to crumb");
@@ -120,7 +120,7 @@ impl CrumbFollower {
             ));
 
             if let Some(path) = map.find_path(curr_pos, pos) {
-                return Action::MoveTo(path);
+                return (Action::MoveTo(path), "Exploring unknown cell");
             }
 
             self.ctx.debug("No path to random unexplored cell");
@@ -140,7 +140,7 @@ impl CrumbFollower {
 
         self.ctx
             .debug("No unexplored cells found, moving to default dir");
-        Action::MoveDir(self.default_dir)
+        (Action::MoveDir(self.default_dir), "Exploring randomly")
     }
 }
 
@@ -158,7 +158,7 @@ impl Bot for CrumbFollower {
         }
 
         // Determine the next action using a linear decision flow
-        let action = self.determine_next_action(
+        let (action, reason) = self.determine_next_action(
             update.bot_data.pos,
             &update.bot_data.known_map,
             update.tick,
@@ -171,6 +171,7 @@ impl Bot for CrumbFollower {
         Some(ActionWithId {
             id: self.action_counter,
             action,
+            reason,
         })
     }
 }

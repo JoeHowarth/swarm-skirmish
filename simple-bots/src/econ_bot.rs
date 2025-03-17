@@ -95,17 +95,19 @@ impl Bot for EconBot {
 
         // Enrich action with id
         match action {
-            Act(action) => {
+            Act(action, reason) => {
                 self.action_counter += 1;
                 debug!(
                     self,
-                    "Taking action: {:?} with id: {}",
+                    "Taking action: {:?} with id: {}, reason: {}",
                     action,
-                    self.action_counter
+                    self.action_counter,
+                    reason
                 );
                 Some(ActionWithId {
                     id: self.action_counter,
                     action,
+                    reason,
                 })
             }
             Wait => None,
@@ -130,41 +132,58 @@ impl EconBot {
     fn base_behavior(&mut self, update: &BotUpdate) -> DecisionResult {
         self.wait_for_in_progress_action(&update.in_progress_action)?;
 
-        let bot_data = &update.bot_data;
+        let bot = &update.bot_data;
         debug!(
             self,
             "Base checking inventory - Metal: {}, Energy: {}",
-            bot_data.inventory.get(Item::Metal),
-            bot_data.energy.0
+            bot.inventory.get(Item::Metal),
+            bot.energy.0
         );
 
-        let tractor_count = bot_data
+        if bot.energy.0 < 10 && !bot.subsystems.has(Subsystem::Generator) {
+            if let Some((pos, _)) = self
+                .find_bot(bot, 1, |b| b.subsystems.has(Subsystem::Generator))
+            {
+                let dir = bot.pos.dir_to(&pos).unwrap();
+                return Act(Action::Recharge(dir), "Recharging");
+            }
+        }
+
+        let tractor_count = bot
             .known_bots
             .iter()
             .filter(|b| b.frame == FrameKind::Tractor)
             .count();
+        let flea_count = bot
+            .known_bots
+            .iter()
+            .filter(|b| b.frame == FrameKind::Flea)
+            .count();
 
         debug!(self, "Current tractor count: {}", tractor_count);
 
-        if tractor_count == 0 {
-            if bot_data.inventory.get(Item::Metal)
-                >= FrameKind::Tractor.build_cost()
-            {
+        if flea_count == 0 {
+            if bot.inventory.get(Item::Metal) >= FrameKind::Flea.build_cost() {
                 debug!(
                     self,
-                    "Base has enough metal ({}), building a tractor with \
-                     cargo bay",
-                    bot_data.inventory.get(Item::Metal)
+                    "Base has enough metal ({}), building a flea with cargo \
+                     bay",
+                    bot.inventory.get(Item::Metal)
                 );
-                return Act(Action::Build(
-                    Dir::Up,
-                    FrameKind::Tractor,
-                    Subsystems::new([(Subsystem::CargoBay, 6)]),
-                ));
+                return Act(
+                    Action::Build(
+                        Dir::Up,
+                        FrameKind::Flea,
+                        Subsystems::new([(Subsystem::CargoBay, 1)]),
+                    ),
+                    "Building Flea-Harvester",
+                );
+            } else {
+                return Wait;
             }
         }
 
-        let generator_count = bot_data
+        let generator_count = bot
             .known_bots
             .iter()
             .filter(|b| b.subsystems.has(Subsystem::Generator))
@@ -173,49 +192,55 @@ impl EconBot {
         debug!(self, "Current generator count: {}", generator_count);
 
         if generator_count == 0 {
-            if bot_data.inventory.get(Item::Metal)
+            if bot.inventory.get(Item::Metal)
                 >= FrameKind::Building(BuildingKind::Small).build_cost()
             {
                 debug!(
                     self,
                     "Base has enough metal ({}), building a small building \
                      with generator",
-                    bot_data.inventory.get(Item::Metal)
+                    bot.inventory.get(Item::Metal)
                 );
-                return Act(Action::Build(
-                    Dir::Right,
-                    FrameKind::Building(BuildingKind::Small),
-                    Subsystems::new([
-                        (Subsystem::Generator, 1),
-                        (Subsystem::PowerCell, 5),
-                    ]),
-                ));
+                return Act(
+                    Action::Build(
+                        Dir::Right,
+                        FrameKind::Building(BuildingKind::Small),
+                        Subsystems::new([
+                            (Subsystem::Generator, 1),
+                            (Subsystem::PowerCell, 5),
+                        ]),
+                    ),
+                    "Building generator",
+                );
+            } else {
+                return Wait;
             }
         }
 
-        if bot_data.inventory.get(Item::Metal)
-            >= FrameKind::Tractor.build_cost()
-        {
+        if bot.inventory.get(Item::Metal) >= FrameKind::Tractor.build_cost() {
             debug!(
                 self,
                 "Base has enough metal ({}), building a tractor with cargo \
                  bay and power cell",
-                bot_data.inventory.get(Item::Metal)
+                bot.inventory.get(Item::Metal)
             );
-            return Act(Action::Build(
-                Dir::Up,
-                FrameKind::Tractor,
-                Subsystems::new([
-                    (Subsystem::CargoBay, 5),
-                    (Subsystem::PowerCell, 1),
-                ]),
-            ));
+            return Act(
+                Action::Build(
+                    Dir::Up,
+                    FrameKind::Tractor,
+                    Subsystems::new([
+                        (Subsystem::CargoBay, 4),
+                        (Subsystem::PowerCell, 2),
+                    ]),
+                ),
+                "Building Tractor-Harvester ",
+            );
         }
 
         debug!(
             self,
             "Base waiting for resources, current metal: {}",
-            bot_data.inventory.get(Item::Metal)
+            bot.inventory.get(Item::Metal)
         );
         Wait
     }
@@ -229,37 +254,6 @@ impl EconBot {
         match state {
             GathererState::Idle => {
                 debug!(self, "Gatherer is idle, looking for a base");
-
-                // let (target, _) = self
-                //     .grid
-                //     .iter()
-                //     .find(|(pos, cell)| {
-                //         if cell.is_unknown() {
-                //             return false;
-                //         }
-
-                //         println!("Cell Known {pos:?}");
-                //         let Some(pawn_id) = cell.pawn else {
-                //             return false;
-                //         };
-
-                //         let pawn = self
-                //             .seen_bots
-                //             .iter()
-                //             .find(|b| b.bot_id == pawn_id)
-                //             .expect("Grid pawn not found in seen bots");
-
-                //         println!(
-                //             "Cell has pawn {:?} with frame {:?}",
-                //             pawn.bot_id, pawn.frame
-                //         );
-                //         pawn.frame ==
-                // FrameKind::Building(BuildingKind::Small)
-                //     })
-                //     .unwrap();
-                // println!("Target {target:?}");
-
-                println!("Bot {:?}", bot.known_bots);
 
                 let Some((target, _)) =
                     bot.known_map.find_nearby(bot.pos, 1000, |cell| {
@@ -307,7 +301,10 @@ impl EconBot {
                 self,
                 "Next to base with metal, transferring in direction: {:?}", dir
             );
-            return Act(Action::Transfer((Item::Metal, dir)));
+            return Act(
+                Action::Transfer((Item::Metal, dir)),
+                "Transferring metal",
+            );
         }
 
         // full => return to base to unload
@@ -319,7 +316,7 @@ impl EconBot {
                 bot.inventory.capacity
             );
             if let Some(path) = bot.known_map.find_path_adj(bot.pos, *base) {
-                return Act(Action::MoveTo(path));
+                return Act(Action::MoveTo(path), "Moving to base");
             }
         }
 
@@ -330,9 +327,12 @@ impl EconBot {
                 .find_nearby(bot.pos, 50, |cell| cell.item == Some(Item::Metal))
         {
             debug!(self, "Found metal at {:?}", target);
-            return self.move_and_act(bot, target, |dir| {
-                Action::Pickup((Item::Metal, Some(dir)))
-            });
+            return self.move_and_act(
+                bot,
+                target,
+                |dir| Action::Pickup((Item::Metal, Some(dir))),
+                "Picking up metal",
+            );
         }
 
         // Check nearby if there are any unexplored cells that may have metal
@@ -347,7 +347,7 @@ impl EconBot {
                 bot.inventory.get(Item::Metal)
             );
             if let Some(path) = bot.known_map.find_path_adj(bot.pos, *base) {
-                return Act(Action::MoveTo(path));
+                return Act(Action::MoveTo(path), "Delivering metal to base");
             }
         }
         Continue
@@ -379,7 +379,10 @@ impl EconBot {
                     if let Some(path) =
                         bot.known_map.find_path_adj(bot.pos, *base)
                     {
-                        return Act(Action::MoveTo(path));
+                        return Act(
+                            Action::MoveTo(path),
+                            "Nothing to explore, returning to base",
+                        );
                     }
                 }
                 Wait
@@ -399,7 +402,7 @@ impl EconBot {
         if let Some((target, _)) = unknown_cell {
             debug!(self, "Found unknown cell at {:?}", target);
             if let Some(path) = bot.known_map.find_path(bot.pos, target) {
-                return Act(Action::MoveTo(path));
+                return Act(Action::MoveTo(path), "Exploring");
             }
         } else {
             debug!(self, "No unknown cells found within range");
@@ -436,7 +439,9 @@ impl EconBot {
                     energy_level,
                     max_energy
                 );
-                return Act(Action::Recharge(dir));
+                if bot.max_energy().0 - 10 >= energy_level {
+                    return Act(Action::Recharge(dir), "Recharging");
+                }
             }
 
             if energy_level < 50
@@ -449,7 +454,12 @@ impl EconBot {
                     max_energy,
                     distance_to_base
                 );
-                return self.move_and_act(bot, base, Action::Recharge);
+                return self.move_and_act(
+                    bot,
+                    base,
+                    Action::Recharge,
+                    "Returning to base to recharge",
+                );
             }
         }
 
@@ -461,6 +471,7 @@ impl EconBot {
         bot: &BotData,
         target: Pos,
         action: impl FnOnce(Dir) -> Action,
+        reason: &'static str,
     ) -> DecisionResult {
         if let Some(dir) = bot.pos.dir_to(&target) {
             debug!(
@@ -469,7 +480,7 @@ impl EconBot {
                 target,
                 dir
             );
-            return Act(action(dir));
+            return Act(action(dir), reason);
         }
         if let Some(path) = bot.known_map.find_path_adj(bot.pos, target) {
             debug!(
@@ -478,7 +489,7 @@ impl EconBot {
                 target,
                 path.len()
             );
-            return Act(Action::MoveTo(path));
+            return Act(Action::MoveTo(path), reason);
         }
 
         debug!(self, "Cannot find path to target {:?}", target);

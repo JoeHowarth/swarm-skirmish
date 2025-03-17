@@ -1,27 +1,31 @@
 use std::ops::{Add, Deref, DerefMut, Sub};
 
 use bevy_math::{IVec2, UVec2, Vec2};
-use bevy_utils::HashMap;
+use bevy_utils::{tracing::warn, HashMap};
 use serde::{Deserialize, Serialize};
 use strum::{EnumCount, VariantArray};
 use strum_macros::{Display, FromRepr};
 
 use crate::Subsystem;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Inventory {
     pub items_table: U8Table<{ Item::COUNT as usize }, Item>,
     pub capacity: u8,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct U8Table<const N: usize, T: EnumCount + From<u8> + Into<u8>> {
     pub items_table: [u8; N],
     pub capacity: u8,
     _phantom: std::marker::PhantomData<T>,
 }
 
-impl<const N: usize, T: EnumCount + From<u8> + Into<u8> + Copy> U8Table<N, T> {
+impl<
+        const N: usize,
+        T: std::fmt::Debug + EnumCount + From<u8> + Into<u8> + Copy,
+    > U8Table<N, T>
+{
     pub fn new(capacity: u8) -> Self {
         U8Table {
             items_table: [0; N],
@@ -58,6 +62,10 @@ impl<const N: usize, T: EnumCount + From<u8> + Into<u8> + Copy> U8Table<N, T> {
 
     pub fn add(&mut self, item: T, count: u8) -> bool {
         if count > self.capacity {
+            warn!(
+                "Cannot add {} of item {:?} to inventory of capacity {}",
+                count, item, self.capacity
+            );
             false
         } else {
             self.items_table[item.into() as usize] += count;
@@ -117,7 +125,17 @@ impl DerefMut for Inventory {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+impl std::fmt::Debug for Inventory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Inventory {{")?;
+        for (item, count) in self.iter() {
+            write!(f, "{:?}: {},", item, count)?;
+        }
+        write!(f, "}}")
+    }
+}
+
+#[derive(Clone, PartialEq, Eq)]
 pub struct Subsystems(pub U8Table<{ Subsystem::COUNT as usize }, Subsystem>);
 
 impl Subsystems {

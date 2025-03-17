@@ -54,6 +54,7 @@ pub type ActionId = u32;
 pub struct ActionWithId {
     pub id: ActionId,
     pub action: Action,
+    pub reason: &'static str,
 }
 
 #[derive(Debug, Clone, EnumDiscriminants)]
@@ -90,10 +91,7 @@ impl BotData {
         Self {
             frame: frame_kind,
             energy,
-            inventory: Inventory::new(
-                subsystems.get(Subsystem::CargoBay) * 2,
-                [],
-            ),
+            inventory: Inventory::new(subsystems.get(Subsystem::CargoBay), []),
             subsystems,
             pos,
             team,
@@ -215,6 +213,18 @@ impl From<u8> for Subsystem {
     }
 }
 
+impl std::fmt::Debug for Subsystems {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Subsystems {{")?;
+        for (subsystem, count) in self.iter() {
+            if count > 0 {
+                write!(f, "{:?}: {},", subsystem, count)?;
+            }
+        }
+        write!(f, "}}")
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum BuildingKind {
     #[default]
@@ -265,6 +275,7 @@ pub struct ActionResult {
     pub action: Action,
     pub id: ActionId,
     pub status: ActionStatus,
+    pub reason: &'static str,
     pub completed_tick: u32,
 }
 
@@ -295,7 +306,7 @@ pub enum DecisionResult {
     /// Wait for current action to complete
     Wait,
     /// Perform a new action
-    Act(Action),
+    Act(Action, &'static str),
 }
 
 impl DecisionResult {
@@ -321,7 +332,7 @@ impl Try for DecisionResult {
     fn branch(self) -> ControlFlow<Self::Residual, Self::Output> {
         match self {
             DecisionResult::Continue => ControlFlow::Continue(()),
-            decision @ (DecisionResult::Wait | DecisionResult::Act(_)) => {
+            decision @ (DecisionResult::Wait | DecisionResult::Act(_, _)) => {
                 ControlFlow::Break(decision)
             }
         }

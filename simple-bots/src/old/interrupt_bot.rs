@@ -83,7 +83,7 @@ impl InterruptBot {
             if let Some(path) = known_map.find_path(curr_pos, pos) {
                 debug!(self, "Going to Fent at position: {pos}");
 
-                return Act(Action::MoveTo(path.into_iter().collect()));
+                return Act(Action::MoveTo(path), "Going to Fent");
             }
 
             debug!(self, "No path to Fent");
@@ -103,7 +103,7 @@ impl InterruptBot {
             radar.find_adj(curr_pos, |cell| cell.item == Some(Truffle))
         {
             debug!(self, "Picking up Truffle {dir:?}");
-            return Act(Action::Pickup((Truffle, Some(dir))));
+            return Act(Action::Pickup((Truffle, Some(dir))), "Picking up Truffle");
         }
 
         // Go to known Truffle location
@@ -116,7 +116,7 @@ impl InterruptBot {
             debug!(self, "Going to truffle at position: {pos}");
 
             if let Some(path) = radar.find_path(curr_pos, pos) {
-                return Act(Action::MoveTo(path.into_iter().collect()));
+                return Act(Action::MoveTo(path), "Going to truffle");
             }
 
             debug!(self, "No path to truffle");
@@ -141,7 +141,7 @@ impl InterruptBot {
         debug!(self, "Found Crumb at world position: {pos}");
 
         if let Some(path) = known_map.find_path(curr_pos, pos) {
-            return Act(Action::MoveTo(path.into_iter().collect()));
+            return Act(Action::MoveTo(path), "Following crumbs");
         }
 
         debug!(self, "No path to crumb");
@@ -166,7 +166,7 @@ impl InterruptBot {
             debug!(self, "Found random unexplored cell at position: {pos:?}");
 
             if let Some(path) = radar.find_path(curr_pos, pos) {
-                return Act(Action::MoveTo(path.into_iter().collect()));
+                return Act(Action::MoveTo(path), "Exploring unknown cell");
             }
 
             debug!(self, "No path to random unexplored cell");
@@ -187,7 +187,7 @@ impl InterruptBot {
                 Dir::from_repr(self.rng.random_range(0..=3)).unwrap();
         }
 
-        Act(Action::MoveDir(self.default_dir))
+        Act(Action::MoveDir(self.default_dir), "Exploring randomly")
     }
 }
 
@@ -208,9 +208,10 @@ impl Bot for InterruptBot {
         // Enrich action with id
         self.action_counter += 1;
         match action {
-            Act(action) => Some(ActionWithId {
+            Act(action, reason) => Some(ActionWithId {
                 id: self.action_counter,
                 action,
+                reason,
             }),
             Wait => None,
             Continue => None,

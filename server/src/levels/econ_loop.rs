@@ -122,13 +122,18 @@ pub(super) fn init_econ_loop(mut commands: Commands, level_args: Res<Levels>) {
                         (Subsystem::CargoBay, 3),
                         (Subsystem::PowerCell, 2),
                     ]),
-                    Pos((bot1_x, bot1_y)),
+                    dbg!(Pos((bot1_x, bot1_y))),
                     team,
                     Energy(100),
                     KnownMap::new(width, height, ClientCellState::default()),
                     Vec::new(),
                 );
-                bot_data.inventory.add(Item::Metal, 6);
+
+                dbg!(&bot_data.inventory);
+                let capacity = bot_data.inventory.capacity;
+                bot_data.inventory.add(Item::Metal, capacity);
+                dbg!(&bot_data.inventory, bot_data.inventory.get(Item::Metal));
+
                 bot_data.energy = bot_data.max_energy();
                 bot_data
             })
