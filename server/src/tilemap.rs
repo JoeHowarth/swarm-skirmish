@@ -7,8 +7,10 @@ use bevy::{
 use bevy_ecs_tilemap::prelude::*;
 use image::DynamicImage;
 use swarm_lib::{
+    known_map::ClientCellState,
     Action::{self, *},
     BotData,
+    BuildingKind,
     CellKind,
     FrameKind,
     Item,
@@ -18,6 +20,7 @@ use swarm_lib::{
 
 use crate::{
     apply_actions::{ActionContainer, ActionState, CurrentAction},
+    bot_update::BotIdToEntity,
     get_map_size,
     types::{CellState, GridWorld},
     GameState,
@@ -26,16 +29,47 @@ use crate::{
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
 pub struct TilemapSystemSimUpdateSet;
-#[derive(Debug)]
-pub enum CellRender {
-    Empty,
-    Blocked,
-    Pawn(bool, FrameKind),
-    Item(Item),
+
+#[derive(Resource)]
+struct Textures {
+    // ascii: Handle<Image>,
+    terrain: Handle<Image>,
+    items: Handle<Image>,
+    pawns: (Handle<Image>, Handle<TextureAtlasLayout>),
+    fog_of_war: Handle<Image>,
 }
 
 #[derive(Resource)]
-struct AsciiTexture(Handle<Image>);
+struct TilemapLayers {
+    terrain: Entity,
+    fow: Entity,
+    items: Entity,
+}
+
+#[derive(Resource)]
+enum MapMode {
+    All,
+    Team(Team),
+    Bot(Entity),
+}
+
+enum FogOfWarLevel {
+    Full,
+    TwoThirds,
+    OneThird,
+    None,
+}
+
+impl From<FogOfWarLevel> for TileTextureIndex {
+    fn from(value: FogOfWarLevel) -> Self {
+        TileTextureIndex(match value {
+            FogOfWarLevel::Full => 0,
+            FogOfWarLevel::TwoThirds => 1,
+            FogOfWarLevel::OneThird => 2,
+            FogOfWarLevel::None => 3,
+        })
+    }
+}
 
 pub struct TilemapPlugin;
 
@@ -46,9 +80,10 @@ impl Plugin for TilemapPlugin {
         // Initialize the TilemapWorldCoords resource with default values
         app.insert_resource(TilemapWorldCoords {
             transform: Transform::default(),
-            grid_size: TilemapGridSize { x: 18.0, y: 18.0 },
+            grid_size: TilemapGridSize { x: 32.0, y: 32.0 },
             map_type: TilemapType::Square,
         });
+        app.insert_resource(MapMode::All);
         // Add system to update the resource
         app.add_systems(OnEnter(GameState::InGame), setup_map);
         app.add_systems(OnExit(GameState::InGame), remove_map);
@@ -59,7 +94,8 @@ impl Plugin for TilemapPlugin {
         );
         app.add_systems(
             Update,
-            (render_grid).in_set(TilemapSystemSimUpdateSet),
+            (ensure_bot_sprite, render_bots, render_grid)
+                .in_set(TilemapSystemSimUpdateSet),
         );
     }
 }
@@ -83,7 +119,6 @@ fn render_move_to(
             (kind, state)
         {
             let mut pos = bot_data.pos;
-
             for dst in &path[*idx..] {
                 let src_world = tilemap_coords.pos_to_world(&pos);
                 let dst_world = tilemap_coords.pos_to_world(dst);
@@ -96,7 +131,7 @@ fn render_move_to(
     }
 }
 
-fn setup_map(mut commands: Commands, ascii_texture: Res<AsciiTexture>) {
+fn setup_map(mut commands: Commands, textures: Res<Textures>) {
     let Some((x, y)) = get_map_size() else {
         return;
     };
@@ -104,14 +139,13 @@ fn setup_map(mut commands: Commands, ascii_texture: Res<AsciiTexture>) {
         x: x as u32,
         y: y as u32,
     };
-    let tile_size = TilemapTileSize { x: 18.0, y: 18.0 };
-    let grid_size = TilemapGridSize { x: 18.0, y: 18.0 };
+    let tile_size = TilemapTileSize { x: 32.0, y: 32.0 };
+    let grid_size = TilemapGridSize { x: 32.0, y: 32.0 };
+    let map_type = TilemapType::Square;
 
     // Create tilemap entity early to register with each tile entity
-    let tilemap_entity = commands.spawn_empty().id();
-
-    // Create tile storage
-    let mut tile_storage = TileStorage::empty(map_size);
+    let terrain_entity = commands.spawn_empty().id();
+    let mut terrain_storage = TileStorage::empty(map_size);
 
     // Spawn all tiles
     for x in 0..map_size.x {
@@ -120,29 +154,95 @@ fn setup_map(mut commands: Commands, ascii_texture: Res<AsciiTexture>) {
             let tile_entity = commands
                 .spawn(TileBundle {
                     position: tile_pos,
-                    texture_index: CellRender::Blocked.cell_to_tile(),
-                    tilemap_id: TilemapId(tilemap_entity),
+                    texture_index: TileTextureIndex(2),
+                    tilemap_id: TilemapId(terrain_entity),
                     ..default()
                 })
                 .id();
-            tile_storage.set(&tile_pos, tile_entity);
+            terrain_storage.set(&tile_pos, tile_entity);
         }
     }
 
-    let map_type = TilemapType::Square;
-
     // Spawn the map entity with all required components
-    commands.entity(tilemap_entity).insert(TilemapBundle {
+    commands.entity(terrain_entity).insert(TilemapBundle {
         grid_size,
         map_type,
         size: map_size,
-        storage: tile_storage,
-        texture: TilemapTexture::Single(ascii_texture.0.clone()),
+        storage: terrain_storage,
+        texture: TilemapTexture::Single(textures.terrain.clone()),
         tile_size,
         transform: get_tilemap_center_transform(
-            &map_size, &grid_size, &map_type, -1.0,
+            &map_size, &grid_size, &map_type, -10.0,
         ),
         ..Default::default()
+    });
+
+    let fow_entity = commands.spawn_empty().id();
+    let mut fow_storage = TileStorage::empty(map_size);
+
+    for x in 0..map_size.x {
+        for y in 0..map_size.y {
+            let tile_pos = TilePos { x, y };
+            let tile_entity = commands
+                .spawn(TileBundle {
+                    position: tile_pos,
+                    texture_index: TileTextureIndex(3),
+                    tilemap_id: TilemapId(fow_entity),
+                    ..default()
+                })
+                .id();
+            fow_storage.set(&tile_pos, tile_entity);
+        }
+    }
+
+    commands.entity(fow_entity).insert(TilemapBundle {
+        grid_size,
+        map_type,
+        size: map_size,
+        storage: fow_storage,
+        texture: TilemapTexture::Single(textures.fog_of_war.clone()),
+        tile_size,
+        transform: get_tilemap_center_transform(
+            &map_size, &grid_size, &map_type, -9.0,
+        ),
+        ..Default::default()
+    });
+
+    let ascii_entity = commands.spawn_empty().id();
+    let mut ascii_storage = TileStorage::empty(map_size);
+
+    for x in 0..map_size.x {
+        for y in 0..map_size.y {
+            let tile_pos = TilePos { x, y };
+            let tile_entity = commands
+                .spawn(TileBundle {
+                    position: tile_pos,
+                    texture_index: TileTextureIndex(0),
+                    tilemap_id: TilemapId(ascii_entity),
+                    ..default()
+                })
+                .id();
+            ascii_storage.set(&tile_pos, tile_entity);
+        }
+    }
+
+    commands.entity(ascii_entity).insert(TilemapBundle {
+        grid_size,
+        map_type,
+        size: map_size,
+        storage: ascii_storage,
+        texture: TilemapTexture::Single(textures.items.clone()),
+        tile_size,
+        transform: get_tilemap_center_transform(
+            &map_size, &grid_size, &map_type, -8.0,
+        ),
+        ..Default::default()
+    });
+
+    commands.insert_resource(TilemapLayers {
+        terrain: terrain_entity,
+        fow: fow_entity,
+        items: ascii_entity,
     });
 }
 
@@ -155,45 +255,186 @@ fn remove_map(
     }
 }
 
-fn render_grid(
-    tile_storage: Query<&mut TileStorage>,
-    mut tiles: Query<&mut TileTextureIndex>,
-    teams: Query<&BotData>,
-    grid: Res<GridWorld>,
+fn ensure_bot_sprite(
+    mut commands: Commands,
+    bots: Query<(Entity, &BotData), Without<Sprite>>,
+    textures: Res<Textures>,
+    tilemap_coords: Res<TilemapWorldCoords>,
 ) {
-    let tile_storage = tile_storage.single();
-    for ((x, y), state) in grid.iter() {
-        let pos = TilePos {
-            x: x as u32,
-            y: y as u32,
-        };
-        let tile_entity = tile_storage.get(&pos).unwrap();
-        let render = CellRender::from_state(state, &teams);
-        // trace!(?pos, ?render, "Render");
-
-        *tiles.get_mut(tile_entity).unwrap() = render.cell_to_tile();
+    for (entity, bot_data) in bots.iter() {
+        commands.entity(entity).insert((
+            Sprite::from_atlas_image(
+                textures.pawns.0.clone(),
+                TextureAtlas {
+                    layout: textures.pawns.1.clone(),
+                    index: match bot_data.frame {
+                        FrameKind::Flea => 0,
+                        FrameKind::Tractor => 1,
+                        FrameKind::Building(BuildingKind::Small) => 2,
+                    },
+                },
+            ),
+            Transform::from_xyz(
+                tilemap_coords.pos_to_world(&bot_data.pos).x,
+                tilemap_coords.pos_to_world(&bot_data.pos).y,
+                1.0,
+            )
+            .with_scale(Vec3::new(0.5, 0.5, 1.0)),
+        ));
     }
 }
 
-pub fn load_tileset(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
-    // Load the image data
-    let image_bytes = include_bytes!("../assets/ascii.png");
-    let dynamic_image = image::load_from_memory(image_bytes).unwrap();
-
-    let processed_image = process_magenta_to_black(dynamic_image);
-
-    // Convert to Bevy Image
-    let image = Image::from_dynamic(
-        processed_image,
-        true,
-        RenderAssetUsages::default(),
-    );
-
-    // Store the atlas layout as a resource
-    commands.insert_resource(AsciiTexture(images.add(image)));
+fn render_bots(
+    bot_data_q: Query<&BotData>,
+    mut bots_with_sprites: Query<
+        (Entity, &mut Transform, &mut Visibility),
+        With<Sprite>,
+    >,
+    tilemap_coords: Res<TilemapWorldCoords>,
+    map_mode: Res<MapMode>,
+) {
+    for (entity, mut transform, mut visibility) in bots_with_sprites.iter_mut()
+    {
+        let bot_data = bot_data_q.get(entity).unwrap();
+        match *map_mode {
+            MapMode::All => {
+                *visibility = Visibility::Visible;
+                let pos = tilemap_coords.pos_to_world(&bot_data.pos);
+                transform.translation.x = pos.x;
+                transform.translation.y = pos.y;
+            }
+            MapMode::Team(team) => {
+                todo!()
+            }
+            MapMode::Bot(bot_e) => {
+                todo!()
+            }
+        }
+    }
 }
 
-fn process_magenta_to_black(image: DynamicImage) -> DynamicImage {
+fn render_grid(
+    tile_storage: Query<&TileStorage>,
+    layers: Res<TilemapLayers>,
+    mut tiles: Query<&mut TileTextureIndex>,
+    grid: Res<GridWorld>,
+    map_mode: Res<MapMode>,
+    bot_data: Query<&BotData>,
+) {
+    let terrain_storage = tile_storage.get(layers.terrain).unwrap();
+    let fow_storage = tile_storage.get(layers.fow).unwrap();
+    let items_storage = tile_storage.get(layers.items).unwrap();
+
+    match *map_mode {
+        MapMode::All => {
+            for ((x, y), state) in grid.iter() {
+                let tile_pos = TilePos {
+                    x: x as u32,
+                    y: y as u32,
+                };
+
+                let terrain_texture_index = match state.kind {
+                    CellKind::Empty => TileTextureIndex(0),
+                    CellKind::Blocked => TileTextureIndex(2),
+                    CellKind::Unknown => TileTextureIndex(1),
+                };
+                let terrain_tile_entity =
+                    terrain_storage.get(&tile_pos).unwrap();
+                *tiles.get_mut(terrain_tile_entity).unwrap() =
+                    terrain_texture_index;
+
+                let item_texture_index = match state.item {
+                    Some(Item::Metal) => TileTextureIndex(0),
+                    _ => TileTextureIndex(5),
+                };
+
+                let item_tile_entity = items_storage.get(&tile_pos).unwrap();
+                *tiles.get_mut(item_tile_entity).unwrap() = item_texture_index;
+            }
+        }
+        MapMode::Team(_team) => todo!(),
+        MapMode::Bot(bot_id) => {
+            let bot_data = bot_data.get(bot_id).unwrap();
+
+            for ((x, y), cell) in bot_data.known_map.iter() {
+                let tile_pos = TilePos {
+                    x: x as u32,
+                    y: y as u32,
+                };
+
+                // Terrain
+                let terrain_texture_index = match cell.kind {
+                    CellKind::Empty => TileTextureIndex(0),
+                    CellKind::Blocked => TileTextureIndex(3),
+                    CellKind::Unknown => TileTextureIndex(2),
+                };
+                let terrain_tile_entity =
+                    terrain_storage.get(&tile_pos).unwrap();
+                *tiles.get_mut(terrain_tile_entity).unwrap() =
+                    terrain_texture_index;
+
+                // Fog of War
+                let fow_tile_entity = fow_storage.get(&tile_pos).unwrap();
+                let fow_level = match cell.last_observed {
+                    0 => FogOfWarLevel::None,
+                    x if x < 10 => FogOfWarLevel::OneThird,
+                    _ if cell.is_unknown() => FogOfWarLevel::Full,
+                    _ => FogOfWarLevel::TwoThirds,
+                };
+                *tiles.get_mut(fow_tile_entity).unwrap() = fow_level.into();
+
+                let item_tile_entity = items_storage.get(&tile_pos).unwrap();
+                *tiles.get_mut(item_tile_entity).unwrap() =
+                    TileTextureIndex(77);
+            }
+        }
+    }
+}
+
+pub fn load_tileset(
+    mut commands: Commands,
+    mut images: ResMut<Assets<Image>>,
+    asset_server: Res<AssetServer>,
+    mut atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
+) {
+    // Load the image data
+    // let image_bytes = include_bytes!("../assets/ascii.png");
+    // let dynamic_image = image::load_from_memory(image_bytes).unwrap();
+
+    // let processed_image = process_magenta_to_black(dynamic_image);
+
+    // // Convert to Bevy Image
+    // let ascii_image = Image::from_dynamic(
+    //     processed_image,
+    //     true,
+    //     RenderAssetUsages::default(),
+    // );
+
+    // Store the atlas layout as a resource
+    // let ascii_texture = images.add(ascii_image);
+    let terrain_texture: Handle<Image> = asset_server.load("Terrain.png");
+    let fog_of_war_texture: Handle<Image> = asset_server.load("FogOfWar.png");
+
+    let items_texture: Handle<Image> = asset_server.load("Items.png");
+    let pawns_texture: Handle<Image> = asset_server.load("BotFrames1.png");
+    let pawns_layout = atlas_layouts.add(TextureAtlasLayout::from_grid(
+        (64, 64).into(),
+        4,
+        1,
+        None,
+        None,
+    ));
+
+    commands.insert_resource(Textures {
+        // ascii: ascii_texture,
+        terrain: terrain_texture,
+        items: items_texture,
+        pawns: (pawns_texture, pawns_layout),
+        fog_of_war: fog_of_war_texture,
+    });
+}
+
+fn _process_magenta_to_black(image: DynamicImage) -> DynamicImage {
     let mut rgba_image = image.to_rgba8();
 
     for pixel in rgba_image.pixels_mut() {
@@ -203,51 +444,11 @@ fn process_magenta_to_black(image: DynamicImage) -> DynamicImage {
             pixel[0] = 0;
             pixel[1] = 0;
             pixel[2] = 0;
-            // Keep alpha value unchanged
+            pixel[3] = 50;
         }
     }
 
     DynamicImage::ImageRgba8(rgba_image)
-}
-
-impl CellRender {
-    pub fn cell_to_tile(&self) -> TileTextureIndex {
-        TileTextureIndex(match self {
-            CellRender::Empty => 0,
-            CellRender::Blocked => 219,
-            CellRender::Pawn(true, FrameKind::Building(_)) => 9,
-            CellRender::Pawn(true, _) => 1,
-            CellRender::Pawn(false, FrameKind::Building(_)) => 10,
-            CellRender::Pawn(false, _) => 2,
-            CellRender::Item(Item::Crumb) => 250,
-            CellRender::Item(Item::Fent) => 239,
-            CellRender::Item(Item::Truffle) => 84, // 'T' in ASCII
-            CellRender::Item(Item::Metal) => 109,  // 'M' in ASCII
-        })
-    }
-
-    pub fn from_state(
-        state: &CellState,
-        query: &Query<&BotData>,
-    ) -> CellRender {
-        if let Some(pawn_id) = state.pawn {
-            let bot_data = query.get(pawn_id).unwrap();
-            return CellRender::Pawn(
-                bot_data.team == Team::Player,
-                bot_data.frame,
-            );
-        }
-
-        if let Some(item) = state.item {
-            return CellRender::Item(item);
-        }
-
-        match state.kind {
-            CellKind::Empty => CellRender::Empty,
-            CellKind::Blocked => CellRender::Blocked,
-            CellKind::Unknown => unreachable!(),
-        }
-    }
 }
 
 /// Resource that stores the components needed for world coordinate conversion
@@ -280,12 +481,13 @@ impl TilemapWorldCoords {
 fn update_tilemap_world_coords(
     tilemap: Query<(&Transform, &TilemapGridSize, &TilemapType)>,
     coords: Option<ResMut<TilemapWorldCoords>>,
+    layers: Res<TilemapLayers>,
 ) {
     let Some(mut coords) = coords else {
         return;
     };
 
-    if let Ok((transform, grid_size, map_type)) = tilemap.get_single() {
+    if let Ok((transform, grid_size, map_type)) = tilemap.get(layers.terrain) {
         coords.transform = *transform;
         coords.grid_size = *grid_size;
         coords.map_type = *map_type;

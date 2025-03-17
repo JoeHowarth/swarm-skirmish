@@ -111,34 +111,63 @@ pub(super) fn init_econ_loop(mut commands: Commands, level_args: Res<Levels>) {
     let team = Team::Player;
 
     // Place first bot
-    let (bot1_x, bot1_y) = find_empty_cell(&grid_world);
-    let bot1 = commands
-        .spawn({
-            let mut bot_data = BotData::new(
-                FrameKind::Building(BuildingKind::Small),
-                Subsystems::new([
-                    (Subsystem::Assembler, 1),
-                    (Subsystem::CargoBay, 3),
-                    (Subsystem::PowerCell, 2),
-                ]),
-                Pos((bot1_x, bot1_y)),
-                team,
-                Energy(1),
-                KnownMap::new(width, height, ClientCellState::default()),
-                Vec::new(),
-            );
-            bot_data.inventory.add(Item::Metal, 6);
-            bot_data.energy = bot_data.max_energy();
-            bot_data
-        })
-        .id();
-    grid_world.set_tuple(bot1_x, bot1_y, CellState::new_with_pawn(bot1));
+    {
+        let (bot1_x, bot1_y) = find_empty_cell(&grid_world);
+        let bot1 = commands
+            .spawn({
+                let mut bot_data = BotData::new(
+                    FrameKind::Building(BuildingKind::Small),
+                    Subsystems::new([
+                        (Subsystem::Assembler, 1),
+                        (Subsystem::CargoBay, 3),
+                        (Subsystem::PowerCell, 2),
+                    ]),
+                    Pos((bot1_x, bot1_y)),
+                    team,
+                    Energy(100),
+                    KnownMap::new(width, height, ClientCellState::default()),
+                    Vec::new(),
+                );
+                bot_data.inventory.add(Item::Metal, 6);
+                bot_data.energy = bot_data.max_energy();
+                bot_data
+            })
+            .id();
+        grid_world.set_tuple(bot1_x, bot1_y, CellState::new_with_pawn(bot1));
+    }
 
     // Place metal items
     for _ in 0..20.min(width * height / 20) {
         let (x, y) = find_empty_cell(&grid_world);
         grid_world.get_tuple_mut(x, y).item = Some(Item::Metal);
     }
+
+    // {
+    //     let bot1 = commands
+    //         .spawn({
+    //             let mut bot_data = BotData::new(
+    //                 FrameKind::Flea,
+    //                 Subsystems::new([(Subsystem::CargoBay, 1)]),
+    //                 Pos((width-3, height-1)),
+    //                 team,
+    //                 Energy(100),
+    //                 KnownMap::new(width, height, ClientCellState::default()),
+    //                 Vec::new(),
+    //             );
+    //             bot_data.inventory.add(Item::Metal, 6);
+    //             bot_data.energy = bot_data.max_energy();
+    //             bot_data
+    //         })
+    //         .id();
+    //     grid_world.set_tuple(1, 99, CellState::new_with_pawn(bot1));
+    // }
+
+    // grid_world.get_tuple_mut(1, 1).item = Some(Item::Metal);
+    // grid_world.get_tuple_mut(20, 1).item = Some(Item::Metal);
+    // grid_world.get_tuple_mut(1, 20).item = Some(Item::Metal);
+    // grid_world.get_tuple_mut(20, 20).item = Some(Item::Metal);
+    // grid_world.get_tuple_mut(1, height-1).item = Some(Item::Metal);
+    // grid_world.get_tuple_mut(width-2, height-1).item = Some(Item::Metal);
 
     commands.insert_resource(grid_world);
 }

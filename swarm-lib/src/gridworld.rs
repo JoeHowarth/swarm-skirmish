@@ -189,7 +189,7 @@ impl<CellState: PassableCell> GridWorld<CellState> {
         &self,
         pos: Pos,
         dist: usize,
-        pred: impl Fn(&CellState) -> bool,
+        mut pred: impl FnMut(&CellState) -> bool,
     ) -> Option<(Pos, &CellState)> {
         self.nearby(pos, dist).find(|(_pos, state)| pred(state))
     }

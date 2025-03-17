@@ -30,8 +30,7 @@ use crate::{
 
 #[derive(WrapperApi)]
 struct Api {
-    new_bot:
-        fn(bot_logger: BotLogger, map_size: (usize, usize)) -> Box<dyn Bot>,
+    new_bot: fn(bot_logger: BotLogger) -> Box<dyn Bot>,
 }
 
 #[derive(Resource)]
@@ -79,25 +78,34 @@ pub struct BotInstance {
 #[derive(Resource, Default)]
 pub struct BotIdToEntity(pub HashMap<BotId, Entity>);
 
+impl BotIdToEntity {
+    pub fn mapper<'a>(&'a self) -> impl Fn(BotId) -> Entity + 'a {
+        |bot_id| *self.0.get(&bot_id).unwrap()
+    }
+
+    pub fn u32<'a>(&'a self) -> impl Fn(u32) -> Entity + 'a {
+        |bot_id| *self.0.get(&BotId(bot_id)).unwrap()
+    }
+
+    pub fn to_entity(self: Res<Self>, bot_id: BotId) -> Entity {
+        *self.0.get(&bot_id).unwrap()
+    }
+}
+
 fn ensure_bot_id(
     mut bot_id_to_entity: ResMut<BotIdToEntity>,
     mut commands: Commands,
     query: Query<Entity, (With<BotData>, Without<BotId>)>,
     mut next_id: Local<u32>,
     bot_lib: Res<BotLib>,
-    map_size: Query<&bevy_ecs_tilemap::prelude::TilemapSize>,
 ) {
-    let map_size = map_size.single();
     for entity in query.iter() {
         *next_id += 1;
         let bot_id = BotId(*next_id);
         bot_id_to_entity.0.insert(bot_id, entity);
 
         info!("Creating new bot instance for bot ID: {}", bot_id.0);
-        let bot = bot_lib.0.new_bot(
-            BotLogger::new(bot_id.0),
-            (map_size.x as usize, map_size.y as usize),
-        );
+        let bot = bot_lib.0.new_bot(BotLogger::new(bot_id.0));
         commands
             .entity(entity)
             .insert((bot_id, BotInstance { bot }));
@@ -203,8 +211,13 @@ pub fn update_known_maps(
     // Swap the known map and known bots back for each bot
     for (bot_id, mut bot_data) in query.iter_mut() {
         let (map, known_bots) = maps.get_mut(bot_id).unwrap();
+
+        println!("BotId: {} Known bots: {:?}", bot_id.0, known_bots);
+
         swap(map, &mut bot_data.known_map);
         swap(known_bots, &mut bot_data.known_bots);
+
+        println!("BotId: {} Known bots: {:?}", bot_id.0, bot_data.known_bots);
     }
 }
 
@@ -414,6 +427,8 @@ fn update_known_map<'a>(
                 if old_cell.pawn == Some(bot_id.0) {
                     old_cell.pawn = None;
                 }
+                let new_cell = known_map.get(bot.pos);
+                assert_eq!(new_cell.pawn, Some(bot_id.0));
             }
 
             // Update existing bot data

@@ -20,14 +20,12 @@ pub fn test_fn() -> String {
 }
 
 #[no_mangle]
-pub fn new_bot(ctx: BotLogger, (map_w, map_h): (usize, usize)) -> Box<dyn Bot> {
+pub fn new_bot(ctx: BotLogger) -> Box<dyn Bot> {
     Box::new(econ_bot::EconBot {
         role: econ_bot::EconBotRole::default(),
-        grid: GridWorld::new(map_w, map_h, ClientCellState::default()),
         rng: SmallRng::seed_from_u64(ctx.bot_id as u64),
         ctx,
         action_counter: 0,
-        seen_bots: Vec::new(),
     })
 }
 

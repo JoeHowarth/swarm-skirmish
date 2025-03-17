@@ -19,10 +19,9 @@ pub use radar::*;
 use strum_macros::{Display, EnumCount, EnumDiscriminants, FromRepr};
 pub use types::*;
 
-pub type NewBotNoMangeFn =
-    fn(logger: BotLogger, map_size: (usize, usize)) -> Box<dyn Bot>;
+pub type NewBotNoMangeFn = fn(logger: BotLogger) -> Box<dyn Bot>;
 
-pub trait Bot: Sync + Send + 'static + std::fmt::Debug {
+pub trait Bot: Sync + Send + 'static {
     fn update(&mut self, update: BotUpdate) -> Option<ActionWithId>;
 }
 

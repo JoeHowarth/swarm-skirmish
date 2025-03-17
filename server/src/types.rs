@@ -2,6 +2,7 @@ use bevy::{prelude::*, utils::HashMap};
 use strum_macros::Display;
 use swarm_lib::{
     gridworld::{self, PassableCell},
+    known_map::ClientCellState,
     BuildingKind,
     CellKind,
     Energy,
@@ -12,6 +13,8 @@ use swarm_lib::{
     Subsystems,
     Team,
 };
+
+use crate::bot_update::{BotId, BotIdToEntity};
 
 pub type GridWorld = gridworld::GridWorld<CellState>;
 
@@ -70,6 +73,18 @@ impl CellState {
 
     pub fn can_enter(&self) -> bool {
         self.kind == CellKind::Empty && self.pawn.is_none()
+    }
+
+    pub fn from_client_state(
+        state: &ClientCellState,
+        bot_id_map: &BotIdToEntity,
+    ) -> CellState {
+        CellState {
+            kind: state.kind,
+            partially_built_bot: None, // TODO: fixme
+            pawn: state.pawn.map(bot_id_map.u32()),
+            item: state.item,
+        }
     }
 }
 

@@ -56,9 +56,8 @@ pub struct EconBot {
     pub ctx: BotLogger,
     pub rng: SmallRng,
     pub action_counter: u32,
-    pub grid: GridWorld<ClientCellState>,
-    pub seen_bots: Vec<ClientBotData>,
-
+    // pub grid: GridWorld<ClientCellState>,
+    // pub seen_bots: Vec<ClientBotData>,
     pub role: EconBotRole,
 }
 
@@ -139,8 +138,8 @@ impl EconBot {
             bot_data.energy.0
         );
 
-        let tractor_count = self
-            .seen_bots
+        let tractor_count = bot_data
+            .known_bots
             .iter()
             .filter(|b| b.frame == FrameKind::Tractor)
             .count();
@@ -165,8 +164,8 @@ impl EconBot {
             }
         }
 
-        let generator_count = self
-            .seen_bots
+        let generator_count = bot_data
+            .known_bots
             .iter()
             .filter(|b| b.subsystems.has(Subsystem::Generator))
             .count();
@@ -260,14 +259,16 @@ impl EconBot {
                 //     .unwrap();
                 // println!("Target {target:?}");
 
+                println!("Bot {:?}", bot.known_bots);
+
                 let Some((target, _)) =
-                    self.grid.find_nearby(bot.pos, 1000, |cell| {
+                    bot.known_map.find_nearby(bot.pos, 1000, |cell| {
                         let Some(pawn_id) = cell.pawn else {
                             return false;
                         };
 
-                        let pawn = self
-                            .seen_bots
+                        let pawn = bot
+                            .known_bots
                             .iter()
                             .find(|b| b.bot_id == pawn_id)
                             .expect("Grid pawn not found in seen bots");
@@ -279,7 +280,7 @@ impl EconBot {
                         pawn.frame == FrameKind::Building(BuildingKind::Small)
                     })
                 else {
-                    debug!(self, "No base found, waiting");
+                    debug!(self, "In idle state, no base found, waiting");
                     return Wait;
                 };
                 debug!(self, "Found base at {:?}", target);
@@ -317,16 +318,16 @@ impl EconBot {
                 bot.inventory.size(),
                 bot.inventory.capacity
             );
-            if let Some(path) = self.grid.find_path_adj(bot.pos, *base) {
+            if let Some(path) = bot.known_map.find_path_adj(bot.pos, *base) {
                 return Act(Action::MoveTo(path));
             }
         }
 
         // next to metal => pick up
         // metal nearby => move to
-        if let Some((target, _)) = self
-            .grid
-            .find_nearby(bot.pos, 50, |cell| cell.item == Some(Item::Metal))
+        if let Some((target, _)) =
+            bot.known_map
+                .find_nearby(bot.pos, 50, |cell| cell.item == Some(Item::Metal))
         {
             debug!(self, "Found metal at {:?}", target);
             return self.move_and_act(bot, target, |dir| {
@@ -345,7 +346,7 @@ impl EconBot {
                 "Has metal ({}), returning to base",
                 bot.inventory.get(Item::Metal)
             );
-            if let Some(path) = self.grid.find_path_adj(bot.pos, *base) {
+            if let Some(path) = bot.known_map.find_path_adj(bot.pos, *base) {
                 return Act(Action::MoveTo(path));
             }
         }
@@ -375,7 +376,8 @@ impl EconBot {
                         self,
                         "Explorer has nothing to do, returning to base ",
                     );
-                    if let Some(path) = self.grid.find_path_adj(bot.pos, *base)
+                    if let Some(path) =
+                        bot.known_map.find_path_adj(bot.pos, *base)
                     {
                         return Act(Action::MoveTo(path));
                     }
@@ -391,12 +393,12 @@ impl EconBot {
         max_distance: usize,
     ) -> DecisionResult {
         let unknown_cell =
-            self.grid
+            bot.known_map
                 .find_nearby(bot.pos, max_distance, |cell| cell.is_unknown());
 
         if let Some((target, _)) = unknown_cell {
             debug!(self, "Found unknown cell at {:?}", target);
-            if let Some(path) = self.grid.find_path(bot.pos, target) {
+            if let Some(path) = bot.known_map.find_path(bot.pos, target) {
                 return Act(Action::MoveTo(path));
             }
         } else {
@@ -408,11 +410,11 @@ impl EconBot {
 
     fn ensure_energy(&mut self, bot: &BotData) -> DecisionResult {
         let base = match self
-            .find_bot(bot.pos, 1000, |b| b.subsystems.has(Subsystem::Generator))
+            .find_bot(bot, 1000, |b| b.subsystems.has(Subsystem::Generator))
         {
             Some((base, _)) => base,
             None => {
-                let Some((base, _)) = self.find_bot(bot.pos, 1000, |b| {
+                let Some((base, _)) = self.find_bot(bot, 1000, |b| {
                     b.frame == FrameKind::Building(BuildingKind::Small)
                 }) else {
                     debug!(self, "No recharge base found, continuing");
@@ -469,7 +471,7 @@ impl EconBot {
             );
             return Act(action(dir));
         }
-        if let Some(path) = self.grid.find_path_adj(bot.pos, target) {
+        if let Some(path) = bot.known_map.find_path_adj(bot.pos, target) {
             debug!(
                 self,
                 "Moving to target {:?}, path length: {}",
@@ -499,35 +501,32 @@ impl EconBot {
         return Wait;
     }
 
-    fn find_bot(
-        &self,
-        pos: Pos,
+    fn find_bot<'a>(
+        &'a self,
+        bot: &'a BotData,
         max_distance: usize,
-        pred: impl Fn(&ClientBotData) -> bool,
-    ) -> Option<(Pos, &ClientCellState)> {
-        self.grid.find_nearby(pos, max_distance, |cell| {
-            //
-            let Some(pawn_id) = cell.pawn else {
-                return false;
-            };
-            let Some(pawn) =
-                self.seen_bots.iter().find(|b| b.bot_id == pawn_id)
-            else {
-                return false;
-            };
-            pred(pawn)
-        })
-    }
-}
-
-impl fmt::Debug for EconBot {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("EconBot")
-            .field("action_counter", &self.action_counter)
-            .field("role", &self.role)
-            .field("grid_size", &(self.grid.width(), self.grid.height()))
-            .field("seen_bots_count", &self.seen_bots.len())
-            .finish()
+        pred: impl Fn(&'a ClientBotData) -> bool,
+    ) -> Option<(Pos, &'a ClientBotData)> {
+        let mut found = None;
+        bot.known_map
+            .find_nearby(bot.pos, max_distance, |cell| {
+                //
+                let Some(pawn_id) = cell.pawn else {
+                    return false;
+                };
+                let Some(pawn) =
+                    bot.known_bots.iter().find(|b| b.bot_id == pawn_id)
+                else {
+                    return false;
+                };
+                if pred(pawn) {
+                    found = Some(pawn);
+                    true
+                } else {
+                    false
+                }
+            })
+            .map(|(pos, _)| (pos, found.unwrap()))
     }
 }
 
