@@ -16,8 +16,10 @@ use swarm_lib::{
 };
 
 use crate::{
-    apply_actions::{ActionsSystemSet, CurrentAction},
-    bot_update::{BotId, BotUpdateSystemSet},
+    game::{
+        apply_actions::{ActionsSystemSet, CurrentAction},
+        bot_update::{BotId, BotUpdateSystemSet},
+    },
     types::{GridWorld, Tick},
     DataSource,
     GameState,
@@ -51,7 +53,6 @@ impl Plugin for CorePlugin {
             );
     }
 }
-
 
 fn generate_energy(mut pawns: Query<&mut BotData>) {
     for mut bot_data in pawns.iter_mut() {

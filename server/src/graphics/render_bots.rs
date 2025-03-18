@@ -27,8 +27,10 @@ use super::{
     Textures,
 };
 use crate::{
-    apply_actions::{ActionContainer, ActionState, CurrentAction, PastActions},
-    bot_update::{BotId, BotIdToEntity},
+    game::{
+        apply_actions::{ActionContainer, ActionState, CurrentAction, PastActions},
+        bot_update::{BotId, BotIdToEntity},
+    },
     get_map_size,
     types::{CellState, GridWorld, Tick},
     GameState,

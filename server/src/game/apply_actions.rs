@@ -20,7 +20,7 @@ use swarm_lib::{
 };
 
 use crate::{
-    bot_update::{BotId, BotIdToEntity},
+    game::bot_update::{BotId, BotIdToEntity},
     types::{GridWorld, PartiallyBuiltBot, Tick},
     Pos,
 };

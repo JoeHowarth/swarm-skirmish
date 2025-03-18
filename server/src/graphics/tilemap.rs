@@ -21,8 +21,10 @@ use swarm_lib::{
 
 use super::{MapMode, Textures};
 use crate::{
-    apply_actions::{ActionContainer, ActionState, CurrentAction, PastActions},
-    bot_update::BotIdToEntity,
+    game::{
+        apply_actions::{ActionContainer, ActionState, CurrentAction, PastActions},
+        bot_update::BotIdToEntity,
+    },
     get_map_size,
     types::{CellState, GridWorld, Tick},
     GameState,

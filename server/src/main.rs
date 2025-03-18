@@ -2,13 +2,11 @@
 #![feature(mpmc_channel)]
 #![feature(arbitrary_self_types)]
 
-use core::{CorePlugin, CoreSystemsSet, SimSystemsSet};
 use std::{
     sync::{Arc, LazyLock, OnceLock, RwLock},
     time::Duration,
 };
 
-use apply_actions::{ActionsPlugin, ActionsSystemSet};
 use argh::{FromArgValue, FromArgs};
 use bevy::{
     color::palettes::css,
@@ -17,7 +15,11 @@ use bevy::{
     time::common_conditions::on_timer,
     utils::HashMap,
 };
-use bot_update::{BotId, BotUpdatePlugin, BotUpdateSystemSet};
+use game::{
+    apply_actions::{ActionsPlugin, ActionsSystemSet},
+    bot_update::{BotId, BotUpdatePlugin, BotUpdateSystemSet},
+    core::{CorePlugin, CoreSystemsSet, SimSystemsSet},
+};
 use graphics::{tilemap::TilemapSystemSimUpdateSet, GraphicsSystemSet};
 use levels::{Levels, LevelsDiscriminants, LevelsPlugin};
 use serde::{Deserialize, Serialize};
@@ -34,9 +36,7 @@ use swarm_lib::{
 };
 use types::{CellState, GridWorld, Tick};
 
-mod apply_actions;
-mod bot_update;
-mod core;
+mod game;
 mod graphics;
 mod levels;
 mod types;

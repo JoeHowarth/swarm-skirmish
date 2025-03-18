@@ -14,7 +14,7 @@ use swarm_lib::{
     Team,
 };
 
-use crate::bot_update::{BotId, BotIdToEntity};
+use crate::game::bot_update::{BotId, BotIdToEntity};
 
 pub type GridWorld = gridworld::GridWorld<CellState>;
 
