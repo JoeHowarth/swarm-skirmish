@@ -1,40 +1,32 @@
-#![allow(unused_imports)]
+#![allow(unused_imports, dead_code)]
 #![feature(mpmc_channel)]
 #![feature(arbitrary_self_types)]
 
 use std::{
-    sync::{Arc, LazyLock, OnceLock, RwLock},
+    sync::{LazyLock, RwLock},
     time::Duration,
 };
 
-use argh::{FromArgValue, FromArgs};
+use argh::FromArgs;
 use bevy::{
     color::palettes::css,
     prelude::*,
-    state::state::FreelyMutableState,
-    time::common_conditions::on_timer,
-    utils::HashMap,
 };
 use game::{
-    apply_actions::{ActionsPlugin, ActionsSystemSet},
-    bot_update::{BotId, BotUpdatePlugin, BotUpdateSystemSet},
-    core::{CorePlugin, CoreSystemsSet, SimSystemsSet},
+    apply_actions::ActionsPlugin,
+    bot_update::{BotId, BotUpdatePlugin},
+    core::{CorePlugin, CoreSystemsSet},
 };
-use graphics::{tilemap::TilemapSystemSimUpdateSet, GraphicsSystemSet};
-use levels::{Levels, LevelsDiscriminants, LevelsPlugin};
-use serde::{Deserialize, Serialize};
+use graphics::GraphicsSystemSet;
+use levels::{Levels, LevelsPlugin};
 use strum::IntoDiscriminant;
 use swarm_lib::{
-    bot_logger::BotLogger,
-    Bot,
     BotData,
-    Energy,
-    FrameKind,
     Item,
     Pos,
     Team,
 };
-use types::{CellState, GridWorld, Tick};
+use types::Tick;
 
 mod game;
 mod graphics;
@@ -68,7 +60,6 @@ pub struct Args {
     pub height: Option<usize>,
 }
 
-use dlopen2::wrapper::{Container, WrapperApi};
 
 fn main() {
     let args: Args = argh::from_env();

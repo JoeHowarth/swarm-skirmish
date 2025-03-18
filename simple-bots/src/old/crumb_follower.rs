@@ -1,19 +1,16 @@
-use rand::{rngs::SmallRng, Rng, SeedableRng};
+use rand::{rngs::SmallRng, Rng};
 use swarm_lib::{
     bot_logger::BotLogger,
-    gridworld::{GridWorld, PassableCell},
-    known_map::{ClientBotData, ClientCellState, KnownMap},
+    gridworld::PassableCell,
+    known_map::{ClientBotData, KnownMap},
     Action,
     ActionWithId,
     Bot,
     BotUpdate,
-    CellKind,
     CellStateRadar,
     Dir,
-    Item::{self, *},
-    NewBotNoMangeFn,
+    Item::{*},
     Pos,
-    RadarData,
 };
 
 pub struct CrumbFollower {

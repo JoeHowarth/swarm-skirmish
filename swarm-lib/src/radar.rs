@@ -1,7 +1,16 @@
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
-use crate::{known_map::ClientCellState, CellKind, Dir, FrameKind, Item, Pos, Subsystems, Team};
+use crate::{
+    known_map::ClientCellState,
+    CellKind,
+    Dir,
+    FrameKind,
+    Item,
+    Pos,
+    Subsystems,
+    Team,
+};
 
 #[derive(Debug, Clone)]
 pub struct RadarBotData {

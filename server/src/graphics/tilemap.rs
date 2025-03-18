@@ -1,34 +1,18 @@
-use bevy::{
-    asset::RenderAssetUsages,
-    color::palettes::css,
-    gizmos,
-    prelude::*,
-    text::{FontSmoothing, TextBounds},
-};
+use bevy::prelude::*;
 use bevy_ecs_tilemap::prelude::*;
 use image::DynamicImage;
 use swarm_lib::{
-    known_map::ClientCellState,
-    Action::{self, *},
     BotData,
-    BuildingKind,
     CellKind,
-    FrameKind,
     Item,
     Pos,
-    Team,
 };
 
 use super::{MapMode, Textures};
 use crate::{
-    game::{
-        apply_actions::{ActionContainer, ActionState, CurrentAction, PastActions},
-        bot_update::BotIdToEntity,
-    },
     get_map_size,
-    types::{CellState, GridWorld, Tick},
+    types::{GridWorld, Tick},
     GameState,
-    MAP_SIZE,
 };
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]

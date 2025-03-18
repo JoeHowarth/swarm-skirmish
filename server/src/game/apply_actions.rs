@@ -1,26 +1,19 @@
-use std::collections::VecDeque;
 
-use bevy::{prelude::*, utils::HashMap};
+use bevy::prelude::*;
 use strum::IntoEnumIterator;
 use swarm_lib::{
-    known_map::{ClientBotData, KnownMap},
     Action,
     ActionId,
     ActionResult,
     ActionStatus,
-    ActionStatusDiscriminants,
-    ActionWithId,
     BotData,
-    CellKind,
     Dir,
     Energy,
-    FrameKind,
     Item,
-    Team,
 };
 
 use crate::{
-    game::bot_update::{BotId, BotIdToEntity},
+    game::bot_update::BotId,
     types::{GridWorld, PartiallyBuiltBot, Tick},
     Pos,
 };

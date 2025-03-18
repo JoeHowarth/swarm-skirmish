@@ -1,15 +1,13 @@
-use argh::{FromArgValue, FromArgs};
-use bevy::{prelude::*, state::state::FreelyMutableState, utils::HashMap};
-use rand::{prelude::SliceRandom, Rng};
+use argh::FromArgs;
+use bevy::prelude::*;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
-use strum_macros::EnumDiscriminants;
 use swarm_lib::{
     known_map::{ClientCellState, KnownMap},
     BotData,
     BuildingKind,
     Energy,
     FrameKind,
-    Inventory,
     Item,
     Pos,
     Subsystem,

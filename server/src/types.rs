@@ -1,20 +1,16 @@
-use bevy::{prelude::*, utils::HashMap};
-use strum_macros::Display;
+use bevy::prelude::*;
 use swarm_lib::{
     gridworld::{self, PassableCell},
     known_map::ClientCellState,
-    BuildingKind,
     CellKind,
-    Energy,
     FrameKind,
     Item,
     Pos,
-    Subsystem,
     Subsystems,
     Team,
 };
 
-use crate::game::bot_update::{BotId, BotIdToEntity};
+use crate::game::bot_update::BotIdToEntity;
 
 pub type GridWorld = gridworld::GridWorld<CellState>;
 

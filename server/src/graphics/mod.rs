@@ -3,7 +3,6 @@ use render_bots::{RenderBotsPlugin, RenderBotsSystemSet};
 use swarm_lib::Team;
 use tilemap::{TilemapPlugin, TilemapSystemSimUpdateSet};
 
-use crate::GameState;
 
 pub mod interaction;
 pub mod render_bots;
@@ -47,7 +46,7 @@ pub enum MapMode {
 
 pub fn load_tileset(
     mut commands: Commands,
-    mut images: ResMut<Assets<Image>>,
+    _images: ResMut<Assets<Image>>,
     asset_server: Res<AssetServer>,
     mut atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
 ) {

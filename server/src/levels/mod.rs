@@ -1,7 +1,6 @@
 use argh::{FromArgValue, FromArgs};
 use bevy::{prelude::*, state::state::FreelyMutableState};
 use econ_loop::EconLoopArgs;
-use rand::{prelude::SliceRandom, Rng};
 use random_crumbs_and_truffles::{
     init_random_crumbs_and_truffles,
     RandomCrumbsAndTrufflesArgs,
@@ -11,14 +10,8 @@ use small_crumbs_and_truffles::{
     init_small_crumbs_and_truffles,
     SmallCrumbsAndTrufflesArgs,
 };
-use strum_macros::EnumDiscriminants;
-use swarm_lib::{Energy, Item, Pos, Team};
 
-use crate::{
-    types::{CellState, GridWorld},
-    GameState,
-    MAP_SIZE,
-};
+use crate::GameState;
 
 mod econ_loop;
 mod random_crumbs_and_truffles;

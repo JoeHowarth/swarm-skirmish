@@ -6,7 +6,6 @@ use swarm_lib::{
     BotData,
     Energy,
     FrameKind,
-    Inventory,
     Item,
     Pos,
     Subsystem,
@@ -14,7 +13,6 @@ use swarm_lib::{
     Team,
 };
 
-use super::Levels;
 use crate::{
     types::{CellState, GridWorld},
     MAP_SIZE,

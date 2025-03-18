@@ -1,10 +1,9 @@
 use std::fmt;
 
-use rand::{rngs::SmallRng, Rng, SeedableRng};
+use rand::{rngs::SmallRng, Rng};
 use swarm_lib::{
     bot_logger::BotLogger,
-    gridworld::GridWorld,
-    known_map::{ClientBotData, ClientCellState, KnownMap},
+    known_map::{ClientBotData, KnownMap},
     Action,
     ActionWithId,
     Bot,
@@ -13,10 +12,8 @@ use swarm_lib::{
     CellStateRadar,
     DecisionResult::{self, Act, Continue, Wait},
     Dir,
-    Item::{self, *},
-    NewBotNoMangeFn,
+    Item::{*},
     Pos,
-    RadarData,
 };
 
 pub struct InterruptBot {
@@ -103,7 +100,10 @@ impl InterruptBot {
             radar.find_adj(curr_pos, |cell| cell.item == Some(Truffle))
         {
             debug!(self, "Picking up Truffle {dir:?}");
-            return Act(Action::Pickup((Truffle, Some(dir))), "Picking up Truffle");
+            return Act(
+                Action::Pickup((Truffle, Some(dir))),
+                "Picking up Truffle",
+            );
         }
 
         // Go to known Truffle location

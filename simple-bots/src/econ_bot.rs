@@ -1,26 +1,20 @@
-use std::fmt;
 
-use rand::{rngs::SmallRng, Rng, SeedableRng};
+use rand::rngs::SmallRng;
 use strum::IntoDiscriminant;
 use swarm_lib::{
     bot_logger::BotLogger,
-    gridworld::GridWorld,
-    known_map::{ClientBotData, ClientCellState},
+    known_map::ClientBotData,
     Action,
     ActionWithId,
     Bot,
     BotData,
     BotUpdate,
     BuildingKind,
-    CellKind,
-    CellStateRadar,
     DecisionResult::{self, Act, Continue, Wait},
     Dir,
     FrameKind,
-    Item::{self, *},
-    NewBotNoMangeFn,
+    Item::{self},
     Pos,
-    RadarData,
     Subsystem,
     Subsystems,
 };

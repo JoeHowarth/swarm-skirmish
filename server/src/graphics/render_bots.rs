@@ -1,23 +1,9 @@
-use bevy::{
-    asset::RenderAssetUsages,
-    color::palettes::css,
-    gizmos,
-    prelude::*,
-    text::{FontSmoothing, TextBounds},
-};
-use bevy_ecs_tilemap::prelude::*;
-use image::DynamicImage;
+use bevy::{color::palettes::css, prelude::*, text::TextBounds};
 use swarm_lib::{
-    known_map::ClientCellState,
-    Action::{self, *},
-    ActionWithId,
+    Action::{self},
     BotData,
     BuildingKind,
-    CellKind,
     FrameKind,
-    Item,
-    Pos,
-    Team,
 };
 
 use super::{
@@ -28,13 +14,15 @@ use super::{
 };
 use crate::{
     game::{
-        apply_actions::{ActionContainer, ActionState, CurrentAction, PastActions},
+        apply_actions::{
+            ActionContainer,
+            ActionState,
+            CurrentAction,
+            PastActions,
+        },
         bot_update::{BotId, BotIdToEntity},
     },
-    get_map_size,
-    types::{CellState, GridWorld, Tick},
-    GameState,
-    MAP_SIZE,
+    types::Tick,
 };
 
 pub struct RenderBotsPlugin;
@@ -152,7 +140,6 @@ fn render_bots(
     mut bot_action_labels: Query<(&mut Text2d, &BotLabel)>,
     tilemap_coords: Res<TilemapWorldCoords>,
     map_mode: Res<MapMode>,
-    bot_id_to_entity: Res<BotIdToEntity>,
 ) {
     for (
         entity,
@@ -163,7 +150,7 @@ fn render_bots(
         past_actions,
     ) in bots_with_sprites.iter_mut()
     {
-        let (bot_data, bot_id) = bot_data_q.get(entity).unwrap();
+        let (bot_data, _) = bot_data_q.get(entity).unwrap();
         match *map_mode {
             MapMode::All => {
                 update_bot_sprite(
@@ -204,7 +191,7 @@ fn render_bots(
                 //     }
                 // }
             }
-            MapMode::Team(team) => {
+            MapMode::Team(_team) => {
                 todo!()
             }
             MapMode::Bot(bot_e) => {
@@ -289,7 +276,7 @@ fn update_text_labels(
     let child = children
         .iter()
         .find(|child| {
-            let Ok((text, BotLabel::Action)) = bot_action_labels.get(**child)
+            let Ok((_, BotLabel::Action)) = bot_action_labels.get(**child)
             else {
                 return false;
             };
@@ -301,7 +288,7 @@ fn update_text_labels(
     let child = children
         .iter()
         .find(|child| {
-            let Ok((text, BotLabel::Energy)) = bot_action_labels.get(**child)
+            let Ok((_, BotLabel::Energy)) = bot_action_labels.get(**child)
             else {
                 return false;
             };

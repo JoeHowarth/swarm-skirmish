@@ -2,8 +2,7 @@ use bevy::{prelude::*, utils::HashMap};
 use dlopen2::wrapper::{Container, WrapperApi};
 use swarm_lib::{
     bot_logger::BotLogger,
-    gridworld::PassableCell,
-    known_map::{ClientBotData, ClientCellState, KnownMap},
+    known_map::{ClientBotData, KnownMap},
     Action,
     ActionResult,
     ActionStatus,
@@ -12,15 +11,8 @@ use swarm_lib::{
     BotData,
     BotUpdate,
     CellKind,
-    CellStateRadar,
-    Energy,
-    FrameKind,
     Item,
     Pos,
-    RadarBotData,
-    RadarData,
-    Subsystems,
-    Team,
 };
 
 use crate::{

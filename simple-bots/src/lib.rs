@@ -3,11 +3,7 @@
 use rand::{rngs::SmallRng, SeedableRng};
 use swarm_lib::{
     bot_logger::BotLogger,
-    gridworld::GridWorld,
-    known_map::ClientCellState,
     Bot,
-    Dir,
-    Item::*,
     NewBotNoMangeFn,
 };
 
