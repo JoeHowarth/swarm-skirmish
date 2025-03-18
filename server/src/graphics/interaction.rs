@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use super::MapMode;
-use crate::core::TickSpeed;
+use crate::TickSpeed;
 
 #[derive(Resource)]
 pub enum Selected {

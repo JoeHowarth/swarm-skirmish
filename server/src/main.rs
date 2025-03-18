@@ -2,7 +2,7 @@
 #![feature(mpmc_channel)]
 #![feature(arbitrary_self_types)]
 
-use core::{should_tick, CorePlugin, CoreSystemsSet, TickSpeed};
+use core::{CorePlugin, CoreSystemsSet, SimSystemsSet};
 use std::{
     sync::{Arc, LazyLock, OnceLock, RwLock},
     time::Duration,
@@ -32,7 +32,7 @@ use swarm_lib::{
     Pos,
     Team,
 };
-use types::{CellState, GridWorld};
+use types::{CellState, GridWorld, Tick};
 
 mod apply_actions;
 mod bot_update;
@@ -115,6 +115,7 @@ fn main() {
             ms: args.tick_ms,
             is_paused: false,
         })
+        .insert_state(DataSource::Live)
         .add_systems(Startup, camera_setup)
         .add_systems(
             OnExit(GameState::InGame),
@@ -126,18 +127,57 @@ fn main() {
         )
         .configure_sets(
             Update,
-            (
-                CoreSystemsSet,
-                BotUpdateSystemSet,
-                ActionsSystemSet,
-                GraphicsSystemSet,
-            )
+            (TickSystemSet, CoreSystemsSet, GraphicsSystemSet)
                 .chain()
                 .run_if(in_state(GameState::InGame))
                 .run_if(should_tick),
         )
-        .add_systems(Update, (exit_system, check_win_condition, display_win_ui))
+        .add_systems(
+            Update,
+            (
+                update_tick.in_set(TickSystemSet),
+                exit_system,
+                check_win_condition,
+                display_win_ui,
+            ),
+        )
         .run();
+}
+
+#[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
+struct TickSystemSet;
+
+#[derive(Resource)]
+pub struct TickSpeed {
+    pub ms: u64,
+    pub is_paused: bool,
+}
+
+pub fn should_tick(
+    tick_ms: Res<TickSpeed>,
+    time: Res<Time>,
+    mut timer: Local<Timer>,
+) -> bool {
+    if tick_ms.is_paused {
+        return false;
+    }
+    timer.tick(time.delta());
+    if timer.just_finished() {
+        timer.set_duration(Duration::from_millis(tick_ms.ms));
+        timer.reset();
+        return true;
+    }
+    false
+}
+
+fn update_tick(mut tick: ResMut<Tick>) {
+    tick.0 += 1;
+}
+
+#[derive(States, Hash, Eq, PartialEq, Clone, Debug)]
+pub enum DataSource {
+    Replay,
+    Live,
 }
 
 #[derive(States, Hash, Eq, PartialEq, Clone, Debug, Default)]

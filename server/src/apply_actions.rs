@@ -3,7 +3,20 @@ use std::collections::VecDeque;
 use bevy::{prelude::*, utils::HashMap};
 use strum::IntoEnumIterator;
 use swarm_lib::{
-    known_map::{ClientBotData, KnownMap}, Action, ActionId, ActionResult, ActionStatus, ActionStatusDiscriminants, ActionWithId, BotData, CellKind, Dir, Energy, FrameKind, Item, Team
+    known_map::{ClientBotData, KnownMap},
+    Action,
+    ActionId,
+    ActionResult,
+    ActionStatus,
+    ActionStatusDiscriminants,
+    ActionWithId,
+    BotData,
+    CellKind,
+    Dir,
+    Energy,
+    FrameKind,
+    Item,
+    Team,
 };
 
 use crate::{
@@ -43,7 +56,7 @@ impl Plugin for ActionsPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
-            (validate_actions, apply_actions, update_known_maps)
+            (validate_actions, apply_actions)
                 .chain()
                 .in_set(ActionsSystemSet),
         );
@@ -599,152 +612,4 @@ fn apply_move_to(
         *idx += 1;
         None
     }
-}
-
-fn update_known_maps(
-    tick: Res<Tick>,
-    mut query: Query<(&BotId, &mut BotData)>,
-    grid_world: Res<GridWorld>,
-) {
-    use std::mem::{replace, swap, take};
-
-    // We need to swap the known map and known bots for each bot so that we
-    // can pass the known map to the update_known_map function.
-    // This is cheap because bot Vec and Array2D are essentially pointers to the
-    // heap
-    let mut maps = HashMap::new();
-    for (bot_id, mut bot_data) in query.iter_mut() {
-        let map =
-            replace(&mut bot_data.known_map, KnownMap::new(0, 0, default()));
-        let known_bots = take(&mut bot_data.known_bots);
-        maps.insert(*bot_id, (map, known_bots));
-    }
-
-    // Update the known map for each bot
-    for (bot_id, bot_data) in query.iter() {
-        let (map, known_bots) = maps.get_mut(bot_id).unwrap();
-        let _radar_updates = update_known_map(
-            known_bots,
-            map,
-            tick.0,
-            &bot_data.pos,
-            &grid_world,
-            |e| query.get(e).ok(),
-        );
-    }
-
-    // Swap the known map and known bots back for each bot
-    for (bot_id, mut bot_data) in query.iter_mut() {
-        let (map, known_bots) = maps.get_mut(bot_id).unwrap();
-
-        swap(map, &mut bot_data.known_map);
-        swap(known_bots, &mut bot_data.known_bots);
-    }
-}
-
-#[allow(dead_code)]
-enum RadarUpdate {
-    NewBlocker { pos: Pos },
-    NewItem { item: Item, pos: Pos },
-    NewBot { bot_id: BotId, pos: Pos },
-    BotMoved { bot_id: BotId, from: Pos, to: Pos },
-    BotReseen { bot_id: BotId, pos: Pos },
-}
-
-fn update_known_map<'a>(
-    known_bots: &mut Vec<ClientBotData>,
-    known_map: &mut KnownMap,
-    current_tick: u32,
-    pos: &Pos,
-    grid_world: &GridWorld,
-    get_data: impl Fn(Entity) -> Option<(&'a BotId, &'a BotData)>,
-) -> Vec<RadarUpdate> {
-    // Define the radar range (how far to look in each direction)
-    // This gives a view of 11x11 cells centered on the bot (5 in each
-    // direction)
-    let radar_range = 5;
-
-    // Get bot's world coordinates
-    let mut radar_pawn_ents = Vec::new();
-    let mut radar_updates = Vec::new();
-
-    for (pos, cell) in grid_world.nearby(*pos, radar_range) {
-        let known_cell = known_map.get_mut(pos);
-
-        let was_unknown = known_cell.is_unknown();
-        if was_unknown {
-            if cell.kind == CellKind::Blocked {
-                radar_updates.push(RadarUpdate::NewBlocker { pos });
-            }
-            if let Some(item) = cell.item {
-                radar_updates.push(RadarUpdate::NewItem { item, pos });
-            }
-        }
-
-        if let Some(e) = cell.pawn {
-            radar_pawn_ents.push(e);
-
-            let (bot_id, _) = get_data(e).unwrap();
-            known_cell.pawn = Some(bot_id.0);
-        }
-
-        known_cell.kind = cell.kind;
-        known_cell.item = cell.item;
-        known_cell.last_observed = current_tick;
-    }
-
-    for radar_bot_e in radar_pawn_ents {
-        let (&bot_id, bot) = get_data(radar_bot_e).unwrap();
-
-        // Check if we already know about this bot
-        let known_bot = known_bots.iter_mut().find(|b| b.bot_id == bot_id.0);
-
-        if let Some(known_bot) = known_bot {
-            // If position changed, remove bot from old position in the grid
-            if known_bot.pos != bot.pos {
-                let update = if known_bot.last_observed + 1 < current_tick {
-                    RadarUpdate::BotReseen {
-                        bot_id,
-                        pos: bot.pos,
-                    }
-                } else {
-                    RadarUpdate::BotMoved {
-                        bot_id,
-                        from: known_bot.pos,
-                        to: bot.pos,
-                    }
-                };
-                radar_updates.push(update);
-
-                // Find the cell at the old position and clear its pawn
-                let old_cell = known_map.get_mut(known_bot.pos);
-                if old_cell.pawn == Some(bot_id.0) {
-                    old_cell.pawn = None;
-                }
-                let new_cell = known_map.get(bot.pos);
-                assert_eq!(new_cell.pawn, Some(bot_id.0));
-            }
-
-            // Update existing bot data
-            known_bot.pos = bot.pos;
-            known_bot.last_observed = current_tick;
-        } else {
-            radar_updates.push(RadarUpdate::NewBot {
-                bot_id,
-                pos: bot.pos,
-            });
-
-            // Add new bot data
-            known_bots.push(ClientBotData {
-                bot_id: bot_id.0,
-                team: bot.team,
-                pos: bot.pos,
-                last_observed: current_tick,
-                frame: bot.frame,
-                subsystems: bot.subsystems.clone(),
-            });
-        }
-    }
-
-    radar_updates
 }

@@ -60,7 +60,7 @@ impl Plugin for BotUpdatePlugin {
 
         app.add_systems(
             Update,
-            (create_server_updates.pipe(update_bots))
+            (update_known_maps, update_bots)
                 .chain()
                 .in_set(BotUpdateSystemSet),
         )
@@ -117,31 +117,13 @@ impl BotIdToEntity {
     }
 }
 
-// fn ensure_bot_id(
-//     mut bot_id_to_entity: ResMut<BotIdToEntity>,
-//     mut commands: Commands,
-//     query: Query<Entity, (With<BotData>, Without<BotId>)>,
-//     mut next_id: Local<u32>,
-//     bot_lib: Res<BotLib>,
-// ) {
-//     for entity in query.iter() {
-//         *next_id += 1;
-//         let bot_id = BotId(*next_id);
-//         bot_id_to_entity.0.insert(bot_id, entity);
-
-//         info!("Creating new bot instance for bot ID: {}", bot_id.0);
-//         let bot = bot_lib.0.new_bot(BotLogger::new(bot_id.0));
-//         commands
-//             .entity(entity)
-//             .insert((bot_id, BotInstance { bot }));
-//     }
-// }
-
 fn update_bots(
-    mut updates: In<HashMap<BotId, BotUpdate>>,
+    tick: Res<Tick>,
+    // mut updates: In<HashMap<BotId, BotUpdate>>,
     mut query: Query<(
         Entity,
         &BotId,
+        &BotData,
         &mut CurrentAction,
         &mut PastActions,
         &mut BotInstance,
@@ -150,13 +132,43 @@ fn update_bots(
     for (
         entity,
         bot_id,
+        bot_data,
         mut current_action,
         mut past_actions,
         mut bot_instance,
     ) in query.iter_mut()
     {
         debug!(?bot_id, entity = entity.index(), "Updating bot");
-        let server_update = updates.remove(bot_id).unwrap();
+        // let server_update = updates.remove(bot_id).unwrap();
+
+        let server_update = BotUpdate {
+            tick: tick.0,
+            in_progress_action: {
+                current_action.as_ref().as_ref().map(|action_container| {
+                    ActionWithId {
+                        action: action_container.kind.clone(),
+                        id: action_container.id,
+                        reason: action_container.reason,
+                    }
+                })
+            },
+            completed_action: {
+                past_actions.last().and_then(|action| {
+                    if action.completed_tick == tick.0 {
+                        Some(ActionResult {
+                            action: action.action.clone(),
+                            status: action.status.clone(),
+                            id: action.id,
+                            reason: action.reason,
+                            completed_tick: tick.0,
+                        })
+                    } else {
+                        None
+                    }
+                })
+            },
+            bot_data: bot_data.clone(),
+        };
 
         let maybe_action = bot_instance.bot.update(server_update.clone());
 
@@ -203,131 +215,150 @@ fn update_bots(
     }
 }
 
-pub fn create_server_updates(
+fn update_known_maps(
     tick: Res<Tick>,
-    query: Query<(&BotId, &BotData, &CurrentAction, &PastActions)>,
-) -> HashMap<BotId, BotUpdate> {
-    query
-        .iter()
-        .map(|(bot_id, bot_data, current_action, past_actions)| {
-            (
-                *bot_id,
-                BotUpdate {
-                    tick: tick.0,
-                    in_progress_action: {
-                        current_action.as_ref().map(|action_container| {
-                            ActionWithId {
-                                action: action_container.kind.clone(),
-                                id: action_container.id,
-                                reason: action_container.reason,
-                            }
-                        })
-                    },
-                    completed_action: {
-                        past_actions.last().and_then(|action| {
-                            if action.completed_tick == tick.0 {
-                                Some(ActionResult {
-                                    action: action.action.clone(),
-                                    status: action.status.clone(),
-                                    id: action.id,
-                                    reason: action.reason,
-                                    completed_tick: tick.0,
-                                })
-                            } else {
-                                None
-                            }
-                        })
-                    },
-                    bot_data: bot_data.clone(),
-                },
-            )
-        })
-        .collect()
+    mut query: Query<(&BotId, &mut BotData)>,
+    grid_world: Res<GridWorld>,
+) {
+    use std::mem::{replace, swap, take};
+
+    // We need to swap the known map and known bots for each bot so that we
+    // can pass the known map to the update_known_map function.
+    // This is cheap because bot Vec and Array2D are essentially pointers to the
+    // heap
+    let mut maps = HashMap::new();
+    for (bot_id, mut bot_data) in query.iter_mut() {
+        let map =
+            replace(&mut bot_data.known_map, KnownMap::new(0, 0, default()));
+        let known_bots = take(&mut bot_data.known_bots);
+        maps.insert(*bot_id, (map, known_bots));
+    }
+
+    // Update the known map for each bot
+    for (bot_id, bot_data) in query.iter() {
+        let (map, known_bots) = maps.get_mut(bot_id).unwrap();
+        let _radar_updates = update_known_map(
+            known_bots,
+            map,
+            tick.0,
+            &bot_data.pos,
+            &grid_world,
+            |e| query.get(e).ok(),
+        );
+    }
+
+    // Swap the known map and known bots back for each bot
+    for (bot_id, mut bot_data) in query.iter_mut() {
+        let (map, known_bots) = maps.get_mut(bot_id).unwrap();
+
+        swap(map, &mut bot_data.known_map);
+        swap(known_bots, &mut bot_data.known_bots);
+    }
 }
 
-fn _create_radar_data<'a>(
+#[allow(dead_code)]
+enum RadarUpdate {
+    NewBlocker { pos: Pos },
+    NewItem { item: Item, pos: Pos },
+    NewBot { bot_id: BotId, pos: Pos },
+    BotMoved { bot_id: BotId, from: Pos, to: Pos },
+    BotReseen { bot_id: BotId, pos: Pos },
+}
+
+fn update_known_map<'a>(
+    known_bots: &mut Vec<ClientBotData>,
+    known_map: &mut KnownMap,
+    current_tick: u32,
     pos: &Pos,
     grid_world: &GridWorld,
-    get: impl Fn(
-        Entity,
-    )
-        -> Option<(&'a BotId, &'a Team, &'a FrameKind, &'a Subsystems)>,
-) -> RadarData {
+    get_data: impl Fn(Entity) -> Option<(&'a BotId, &'a BotData)>,
+) -> Vec<RadarUpdate> {
     // Define the radar range (how far to look in each direction)
     // This gives a view of 11x11 cells centered on the bot (5 in each
     // direction)
     let radar_range = 5;
 
     // Get bot's world coordinates
-    let (bot_world_x, bot_world_y) = pos.as_isize();
+    let mut radar_pawn_ents = Vec::new();
+    let mut radar_updates = Vec::new();
 
-    let mut radar = RadarData {
-        center_world_pos: *pos,
-        pawns: Vec::new(),
-        cells: Vec::new(),
-    };
+    for (pos, cell) in grid_world.nearby(*pos, radar_range) {
+        let known_cell = known_map.get_mut(pos);
 
-    // Use nearby to get cells in radar range with Manhattan distance
-    grid_world
-        .nearby(*pos, radar_range)
-        .for_each(|(pos, cell)| {
-            let cell_pos = Pos::from(pos);
+        let was_unknown = known_cell.is_unknown();
+        if was_unknown {
+            if cell.kind == CellKind::Blocked {
+                radar_updates.push(RadarUpdate::NewBlocker { pos });
+            }
+            if let Some(item) = cell.item {
+                radar_updates.push(RadarUpdate::NewItem { item, pos });
+            }
+        }
 
-            let radar_cell = CellStateRadar {
-                kind: match cell.kind {
-                    CellKind::Empty => CellKind::Empty,
-                    CellKind::Blocked => CellKind::Blocked,
-                    CellKind::Unknown => unreachable!(),
-                },
-                pawn: cell.pawn.map(|e| {
-                    let (bot_id, &team, frame, subsystems) = get(e).unwrap();
+        if let Some(e) = cell.pawn {
+            radar_pawn_ents.push(e);
 
-                    // Store the bot's position in world coordinates
-                    radar.pawns.push(RadarBotData {
-                        team,
-                        pos: cell_pos,
-                        bot_id: bot_id.0,
-                        frame: frame.clone(),
-                        subsystems: subsystems.clone(),
-                    });
+            let (bot_id, _) = get_data(e).unwrap();
+            known_cell.pawn = Some(bot_id.0);
+        }
 
-                    radar.pawns.len() - 1
-                }),
-                item: cell.item,
-                pos: cell_pos,
-            };
+        known_cell.kind = cell.kind;
+        known_cell.item = cell.item;
+        known_cell.last_observed = current_tick;
+    }
 
-            radar.cells.push(radar_cell);
-        });
+    for radar_bot_e in radar_pawn_ents {
+        let (&bot_id, bot) = get_data(radar_bot_e).unwrap();
 
-    // Sort radar cells by manhattan distance from center, with direction as
-    // tiebreaker for deterministic ordering
-    radar.cells.sort_by_key(|cell| {
-        let dx = (cell.pos.x() as isize - bot_world_x).unsigned_abs() as u32;
-        let dy = (cell.pos.y() as isize - bot_world_y).unsigned_abs() as u32;
-        let manhattan_distance = (dx + dy) * 100; // Scale by 100 to make room for direction tiebreaker
+        // Check if we already know about this bot
+        let known_bot = known_bots.iter_mut().find(|b| b.bot_id == bot_id.0);
 
-        // Calculate direction as u8 for tiebreaking
-        let dir_value = if dx == 0 && dy == 0 {
-            0 // Center cell
-        } else if dx >= dy {
-            // Primarily east/west
-            if cell.pos.x() as isize >= bot_world_x {
-                1
-            } else {
-                2
-            } // East = 1, West = 2
+        if let Some(known_bot) = known_bot {
+            // If position changed, remove bot from old position in the grid
+            if known_bot.pos != bot.pos {
+                let update = if known_bot.last_observed + 1 < current_tick {
+                    RadarUpdate::BotReseen {
+                        bot_id,
+                        pos: bot.pos,
+                    }
+                } else {
+                    RadarUpdate::BotMoved {
+                        bot_id,
+                        from: known_bot.pos,
+                        to: bot.pos,
+                    }
+                };
+                radar_updates.push(update);
+
+                // Find the cell at the old position and clear its pawn
+                let old_cell = known_map.get_mut(known_bot.pos);
+                if old_cell.pawn == Some(bot_id.0) {
+                    old_cell.pawn = None;
+                }
+                let new_cell = known_map.get(bot.pos);
+                assert_eq!(new_cell.pawn, Some(bot_id.0));
+            }
+
+            // Update existing bot data
+            known_bot.pos = bot.pos;
+            known_bot.last_observed = current_tick;
         } else {
-            // Primarily north/south
-            if cell.pos.y() as isize >= bot_world_y {
-                3
-            } else {
-                4
-            } // North = 3, South = 4
-        };
+            radar_updates.push(RadarUpdate::NewBot {
+                bot_id,
+                pos: bot.pos,
+            });
 
-        manhattan_distance + dir_value
-    });
+            // Add new bot data
+            known_bots.push(ClientBotData {
+                bot_id: bot_id.0,
+                team: bot.team,
+                pos: bot.pos,
+                last_observed: current_tick,
+                frame: bot.frame,
+                subsystems: bot.subsystems.clone(),
+            });
+        }
+    }
 
-    radar
+    radar_updates
 }
