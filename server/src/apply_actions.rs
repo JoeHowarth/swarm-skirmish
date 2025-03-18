@@ -281,7 +281,7 @@ fn is_action_invalid<'a>(
             };
 
             let target_data = get_bot_data(pawn);
-            if target_data.energy < Energy(10) {
+            if target_data.energy < Energy(25) {
                 return Err("Invalid Recharge: Target entity has \
                             insufficient energy"
                     .into());

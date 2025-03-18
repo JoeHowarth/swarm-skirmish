@@ -42,11 +42,11 @@ fn keyboard_interaction(
         println!("Pressed P");
     }
     if keys.just_pressed(KeyCode::BracketLeft) {
-        tick_speed.ms = (tick_speed.ms * 3 / 4).max(50);
+        tick_speed.ms = (tick_speed.ms * 4 / 3).min(2000);
         println!("Decreased tick speed to {}", tick_speed.ms);
     }
     if keys.just_pressed(KeyCode::BracketRight) {
-        tick_speed.ms = (tick_speed.ms * 4 / 3).min(2000);
+        tick_speed.ms = (tick_speed.ms * 3 / 4).max(50);
         println!("Increased tick speed to {}", tick_speed.ms);
     }
 }
