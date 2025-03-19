@@ -1,9 +1,10 @@
 use array2d::Array2D;
 use bevy_ecs::system::Resource;
+use serde::{Deserialize, Serialize};
 
 use crate::{Dir, Pos};
 
-#[derive(Resource, Debug, Clone)]
+#[derive(Resource, Debug, Clone, Serialize, Deserialize)]
 pub struct GridWorld<CellState> {
     pub grid: Array2D<CellState>,
 }

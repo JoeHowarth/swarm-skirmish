@@ -1,19 +1,15 @@
 use std::fmt::Write;
 
 use bevy::prelude::*;
-use swarm_lib::{
-    BotData,
-    Item,
-    Subsystem,
-};
+use swarm_lib::{BotData, Item, Subsystem};
 
 use crate::{
     game::{
         apply_actions::ActionsSystemSet,
         bot_update::{BotId, BotUpdateSystemSet},
     },
+    replay::LiveOrReplay,
     types::{GridWorld, Tick},
-    DataSource,
 };
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
@@ -35,7 +31,7 @@ impl Plugin for CorePlugin {
             )
             .configure_sets(
                 Update,
-                CoreSystemsSet.run_if(in_state(DataSource::Live)),
+                CoreSystemsSet.run_if(in_state(LiveOrReplay::Live)),
             )
             .add_systems(
                 Update,
@@ -46,6 +42,7 @@ impl Plugin for CorePlugin {
 }
 
 fn generate_energy(mut pawns: Query<&mut BotData>) {
+    println!("Generating energy");
     for mut bot_data in pawns.iter_mut() {
         let generators = bot_data.subsystems.get(Subsystem::Generator);
         if generators > 0 {

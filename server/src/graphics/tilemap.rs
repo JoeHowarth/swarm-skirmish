@@ -1,16 +1,10 @@
 use bevy::prelude::*;
 use bevy_ecs_tilemap::prelude::*;
 use image::DynamicImage;
-use swarm_lib::{
-    BotData,
-    CellKind,
-    Item,
-    Pos,
-};
+use swarm_lib::{BotData, CellKind, Item, Pos};
 
 use super::{MapMode, Textures};
 use crate::{
-    get_map_size,
     types::{GridWorld, Tick},
     GameState,
 };
@@ -159,13 +153,20 @@ fn render_grid(
     }
 }
 
-fn setup_map(mut commands: Commands, textures: Res<Textures>) {
-    let Some((x, y)) = get_map_size() else {
-        return;
-    };
+#[derive(Resource)]
+pub struct MapSize {
+    pub x: u32,
+    pub y: u32,
+}
+
+fn setup_map(
+    mut commands: Commands,
+    textures: Res<Textures>,
+    tile_map_size: Res<MapSize>,
+) {
     let map_size = TilemapSize {
-        x: x as u32,
-        y: y as u32,
+        x: tile_map_size.x,
+        y: tile_map_size.y,
     };
     let tile_size = TilemapTileSize { x: 32.0, y: 32.0 };
     let grid_size = TilemapGridSize { x: 32.0, y: 32.0 };

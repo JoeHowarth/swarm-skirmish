@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use serde::{Deserialize, Serialize};
 use swarm_lib::{
     gridworld::{self, PassableCell},
     known_map::ClientCellState,
@@ -17,7 +18,7 @@ pub type GridWorld = gridworld::GridWorld<CellState>;
 #[derive(Resource, Default)]
 pub struct Tick(pub u32);
 
-#[derive(Component, Clone)]
+#[derive(Component, Clone, Debug, Serialize, Deserialize)]
 pub struct PartiallyBuiltBot {
     pub frame_kind: FrameKind,
     pub subsystems: Subsystems,
@@ -27,7 +28,7 @@ pub struct PartiallyBuiltBot {
     pub ticks_remaining: u32,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct CellState {
     pub kind: CellKind,
     pub partially_built_bot: Option<Entity>,

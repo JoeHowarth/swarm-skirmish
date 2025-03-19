@@ -5,6 +5,7 @@ use swarm_lib::{
     BuildingKind,
     FrameKind,
 };
+use ustr::Ustr;
 
 use super::{
     interaction::Selected,
@@ -164,7 +165,7 @@ fn render_bots(
                     children,
                     &mut bot_action_labels,
                     get_reason(&current_tick, &current_action, &past_actions)
-                        .unwrap_or("")
+                        .unwrap_or_default()
                         .to_owned(),
                     format!("E: {}", bot_data.energy.0),
                 );
@@ -221,7 +222,7 @@ fn render_bots(
                             &current_action,
                             &past_actions,
                         )
-                        .unwrap_or("")
+                        .unwrap_or_default()
                         .to_owned(),
                         format!("E: {}", bot_data.energy.0),
                     )
@@ -314,7 +315,7 @@ fn get_reason(
     current_tick: &Tick,
     current_action: &CurrentAction,
     past_actions: &PastActions,
-) -> Option<&'static str> {
+) -> Option<Ustr> {
     if let Some(action) = &current_action.0 {
         Some(action.reason)
     } else if let Some(action) = past_actions.0.last() {

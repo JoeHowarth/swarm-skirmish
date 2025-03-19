@@ -8,10 +8,7 @@ use std::{
 };
 
 use argh::FromArgs;
-use bevy::{
-    color::palettes::css,
-    prelude::*,
-};
+use bevy::{color::palettes::css, prelude::*};
 use game::{
     apply_actions::ActionsPlugin,
     bot_update::{BotId, BotUpdatePlugin},
@@ -19,26 +16,16 @@ use game::{
 };
 use graphics::GraphicsSystemSet;
 use levels::{Levels, LevelsPlugin};
+use replay::{ReplayPlugin, ReplaySystemSet};
 use strum::IntoDiscriminant;
-use swarm_lib::{
-    BotData,
-    Item,
-    Pos,
-    Team,
-};
+use swarm_lib::{BotData, Item, Pos, Team};
 use types::Tick;
 
 mod game;
 mod graphics;
 mod levels;
+mod replay;
 mod types;
-
-static MAP_SIZE: LazyLock<RwLock<Option<(usize, usize)>>> =
-    LazyLock::new(|| RwLock::new(None));
-
-pub fn get_map_size() -> Option<(usize, usize)> {
-    *MAP_SIZE.read().expect("Failed to read RWLock")
-}
 
 #[derive(FromArgs)]
 /// Swarm Server
@@ -46,6 +33,14 @@ pub struct Args {
     #[argh(subcommand)]
     /// the level to load
     pub level: Option<Levels>,
+
+    #[argh(option)]
+    /// the replay file to load
+    pub replay: Option<String>,
+
+    // #[argh(option, default = "String::from(\"replays/replay.json\")")]
+    // /// the replay file to save
+    // pub save_replay: String,
 
     #[argh(option, default = "500")]
     /// the tick rate in milliseconds
@@ -59,7 +54,6 @@ pub struct Args {
     /// the height of the map
     pub height: Option<usize>,
 }
-
 
 fn main() {
     let args: Args = argh::from_env();
@@ -93,6 +87,10 @@ fn main() {
             CorePlugin,
             LevelsPlugin,
             BotUpdatePlugin,
+            ReplayPlugin {
+                // save_replay: args.save_replay,
+                load_replay: args.replay,
+            },
         ))
         .insert_state(
             args.level
@@ -106,7 +104,6 @@ fn main() {
             ms: args.tick_ms,
             is_paused: false,
         })
-        .insert_state(DataSource::Live)
         .add_systems(Startup, camera_setup)
         .add_systems(
             OnExit(GameState::InGame),
@@ -118,7 +115,7 @@ fn main() {
         )
         .configure_sets(
             Update,
-            (TickSystemSet, CoreSystemsSet, GraphicsSystemSet)
+            (TickSystemSet, CoreSystemsSet, ReplaySystemSet, GraphicsSystemSet)
                 .chain()
                 .run_if(in_state(GameState::InGame))
                 .run_if(should_tick),
@@ -163,12 +160,6 @@ pub fn should_tick(
 
 fn update_tick(mut tick: ResMut<Tick>) {
     tick.0 += 1;
-}
-
-#[derive(States, Hash, Eq, PartialEq, Clone, Debug)]
-pub enum DataSource {
-    Replay,
-    Live,
 }
 
 #[derive(States, Hash, Eq, PartialEq, Clone, Debug, Default)]

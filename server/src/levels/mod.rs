@@ -51,6 +51,7 @@ impl Plugin for LevelsPlugin {
 #[argh(subcommand)]
 #[strum_discriminants(derive(Hash))]
 pub enum Levels {
+    Replay(ReplayArgs),
     SmallCrumbsAndTruffles(SmallCrumbsAndTrufflesArgs),
     RandomCrumbsAndTruffles(RandomCrumbsAndTrufflesArgs),
     EconLoop(EconLoopArgs),
@@ -58,7 +59,7 @@ pub enum Levels {
 
 impl Default for Levels {
     fn default() -> Self {
-        Self::SmallCrumbsAndTruffles(SmallCrumbsAndTrufflesArgs {})
+        Self::Replay(ReplayArgs {})
     }
 }
 
@@ -86,3 +87,9 @@ impl FromArgValue for LevelsDiscriminants {
 fn transition_to_in_game(mut next_state: ResMut<NextState<GameState>>) {
     next_state.set(GameState::InGame);
 }
+
+#[derive(
+    FromArgs, Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq,
+)]
+#[argh(subcommand, name = "replay", description = "Replay a game")]
+struct ReplayArgs {}

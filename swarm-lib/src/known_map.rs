@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use crate::{
     gridworld::{GridWorld, PassableCell},
     CellKind,
@@ -10,7 +12,7 @@ use crate::{
 
 pub type KnownMap = GridWorld<ClientCellState>;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClientBotData {
     pub bot_id: u32,
     pub team: Team,
@@ -21,7 +23,7 @@ pub struct ClientBotData {
     pub subsystems: Subsystems,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct ClientCellState {
     pub kind: CellKind,
     // Optional bot_id

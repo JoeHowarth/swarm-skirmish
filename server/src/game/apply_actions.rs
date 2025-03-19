@@ -1,5 +1,5 @@
-
 use bevy::prelude::*;
+use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 use swarm_lib::{
     Action,
@@ -19,22 +19,22 @@ use crate::{
 };
 
 /// High-level action queue with actions sent in from bots
-#[derive(Component, Default, Deref, DerefMut)]
+#[derive(Component, Clone, Default, Deref, DerefMut, Serialize, Deserialize)]
 pub struct CurrentAction(pub Option<ActionContainer>);
 
 /// Past actions that have been applied
-#[derive(Component, Default, Deref, DerefMut)]
+#[derive(Component, Clone, Default, Deref, DerefMut, Serialize, Deserialize)]
 pub struct PastActions(pub Vec<ActionResult>);
 
-#[derive(Component, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ActionContainer {
     pub kind: Action,
     pub id: ActionId,
     pub state: ActionState,
-    pub reason: &'static str,
+    pub reason: ustr::Ustr,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ActionState {
     None,
     MoveTo { idx: usize },

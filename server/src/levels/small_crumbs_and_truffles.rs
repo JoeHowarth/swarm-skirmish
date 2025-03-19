@@ -14,8 +14,8 @@ use swarm_lib::{
 };
 
 use crate::{
+    graphics::tilemap::MapSize,
     types::{CellState, GridWorld},
-    MAP_SIZE,
 };
 
 #[derive(
@@ -30,7 +30,10 @@ pub struct SmallCrumbsAndTrufflesArgs {}
 
 pub(super) fn init_small_crumbs_and_truffles(mut commands: Commands) {
     let (width, height) = (20, 20);
-    *MAP_SIZE.write().unwrap() = Some((width, height));
+    commands.insert_resource(MapSize {
+        x: width as u32,
+        y: height as u32,
+    });
 
     let mut grid_world = GridWorld::new(width, height, CellState::empty());
 

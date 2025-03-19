@@ -16,8 +16,10 @@ pub mod types;
 
 use known_map::{ClientBotData, KnownMap};
 pub use radar::*;
+use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumCount, EnumDiscriminants, FromRepr};
 pub use types::*;
+use ustr::Ustr;
 
 pub type NewBotNoMangeFn = fn(logger: BotLogger) -> Box<dyn Bot>;
 
@@ -25,7 +27,7 @@ pub trait Bot: Sync + Send + 'static {
     fn update(&mut self, update: BotUpdate) -> Option<ActionWithId>;
 }
 
-#[derive(Debug, Clone, Component)]
+#[derive(Debug, Clone, Component, Serialize, Deserialize)]
 pub struct BotData {
     pub frame: FrameKind,
     pub subsystems: Subsystems,
@@ -57,7 +59,7 @@ pub struct ActionWithId {
     pub reason: &'static str,
 }
 
-#[derive(Debug, Clone, EnumDiscriminants)]
+#[derive(Debug, Clone, EnumDiscriminants, Serialize, Deserialize)]
 pub enum Action {
     Noop,
     MoveDir(Dir),
@@ -135,7 +137,7 @@ impl BotData {
     }
 }
 
-#[derive(Default, Display, Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Default, Display, Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FrameKind {
     #[default]
     Flea,
@@ -225,7 +227,7 @@ impl std::fmt::Debug for Subsystems {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum BuildingKind {
     #[default]
     Small,
@@ -270,16 +272,16 @@ impl Action {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActionResult {
     pub action: Action,
     pub id: ActionId,
     pub status: ActionStatus,
-    pub reason: &'static str,
+    pub reason: Ustr,
     pub completed_tick: u32,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, strum_macros::EnumDiscriminants)]
+#[derive(Debug, Clone, PartialEq, Eq, strum_macros::EnumDiscriminants, Serialize, Deserialize)]
 pub enum ActionStatus {
     Success,
     Failure(String),

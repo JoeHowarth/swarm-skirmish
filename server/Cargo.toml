@@ -19,3 +19,4 @@ serde_json = { workspace = true }
 argh = "0.1.13"
 rand = { version = "0.9", features = ["small_rng"] }
 dlopen2 = "0.7"
+ustr = { version = "1", features = ["serde"] }

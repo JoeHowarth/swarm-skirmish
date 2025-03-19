@@ -17,8 +17,8 @@ use swarm_lib::{
 
 use super::Levels;
 use crate::{
+    graphics::tilemap::MapSize,
     types::{CellState, GridWorld},
-    MAP_SIZE,
 };
 
 #[derive(
@@ -45,7 +45,10 @@ pub(super) fn init_econ_loop(mut commands: Commands, level_args: Res<Levels>) {
     };
 
     let (width, height) = (args.width, args.height);
-    *MAP_SIZE.write().unwrap() = Some((width, height));
+    commands.insert_resource(MapSize {
+        x: width as u32,
+        y: height as u32,
+    });
 
     let mut grid_world = GridWorld::new(width, height, CellState::empty());
     let mut rng = rand::rng();

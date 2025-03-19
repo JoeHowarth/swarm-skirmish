@@ -1,5 +1,6 @@
 use bevy::{prelude::*, utils::HashMap};
 use dlopen2::wrapper::{Container, WrapperApi};
+use serde::{Deserialize, Serialize};
 use swarm_lib::{
     bot_logger::BotLogger,
     known_map::{ClientBotData, KnownMap},
@@ -14,6 +15,7 @@ use swarm_lib::{
     Item,
     Pos,
 };
+use ustr::ustr;
 
 use crate::{
     game::apply_actions::{
@@ -33,7 +35,9 @@ struct Api {
 #[derive(Resource)]
 struct BotLib(pub Container<Api>);
 
-#[derive(Component, Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(
+    Component, Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize,
+)]
 #[require(CurrentAction, PastActions)]
 pub struct BotId(pub u32);
 
@@ -68,26 +72,40 @@ impl Plugin for BotUpdatePlugin {
         app.world_mut()
             .register_component_hooks::<BotData>()
             .on_add(|mut world, entity, _| {
-                let mut next_bot_id = world.resource_mut::<NextBotId>();
-                let bot_id = BotId(next_bot_id.0);
-                next_bot_id.0 += 1;
+                // Get the bot ID from the entity or create a new one
+                let bot_id = world
+                    .entity(entity)
+                    .get::<BotId>()
+                    .cloned()
+                    .unwrap_or_else(|| {
+                        let mut next_bot_id = world.resource_mut::<NextBotId>();
+                        let bot_id = BotId(next_bot_id.0);
+                        next_bot_id.0 += 1;
+                        bot_id
+                    });
 
+                // Insert the bot ID -> Entity mapping
                 world
                     .resource_mut::<BotIdToEntity>()
                     .0
                     .insert(bot_id, entity);
 
-                info!("Creating new bot instance for bot ID: {}", bot_id.0);
-                let bot = world
-                    .resource::<BotLib>()
-                    .0
-                    .new_bot(BotLogger::new(bot_id.0));
+                if world.entity(entity).get::<BotInstance>().is_none() {
+                    info!("Creating new bot instance for bot ID: {}", bot_id.0);
+                    let bot = world
+                        .resource::<BotLib>()
+                        .0
+                        .new_bot(BotLogger::new(bot_id.0));
 
-                // Insert the bot instance into the entity
-                world
-                    .commands()
-                    .entity(entity)
-                    .insert((bot_id, BotInstance { bot }));
+                    // Insert the bot ID and instance into the entity
+                    world
+                        .commands()
+                        .entity(entity)
+                        .insert((bot_id, BotInstance { bot }));
+                } else {
+                    // Insert the bot ID into the entity
+                    world.commands().entity(entity).insert(bot_id);
+                }
             });
     }
 }
@@ -145,7 +163,7 @@ fn update_bots(
                     ActionWithId {
                         action: action_container.kind.clone(),
                         id: action_container.id,
-                        reason: action_container.reason,
+                        reason: action_container.reason.as_str(),
                     }
                 })
             },
@@ -176,7 +194,7 @@ fn update_bots(
 
         trace!("Bot ID: {} action: {:?}", bot_id.0, action);
         let action_container = ActionContainer {
-            reason: action.reason,
+            reason: ustr(action.reason),
             state: match &action.action {
                 Action::MoveTo(path) => ActionState::MoveTo {
                     idx: 1.min(path.len().saturating_sub(1)),

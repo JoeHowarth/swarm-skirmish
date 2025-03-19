@@ -8,14 +8,15 @@ use strum_macros::Display;
 
 use crate::Subsystem;
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Inventory {
     pub items_table: U8Table<{ Item::COUNT as usize }, Item>,
     pub capacity: u8,
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct U8Table<const N: usize, T: EnumCount + From<u8> + Into<u8>> {
+    #[serde(with = "serde_bytes")]
     pub items_table: [u8; N],
     pub capacity: u8,
     _phantom: std::marker::PhantomData<T>,
@@ -135,7 +136,7 @@ impl std::fmt::Debug for Inventory {
     }
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Subsystems(pub U8Table<{ Subsystem::COUNT as usize }, Subsystem>);
 
 impl Subsystems {
