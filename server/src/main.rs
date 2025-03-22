@@ -41,7 +41,6 @@ pub struct Args {
     // #[argh(option, default = "String::from(\"replays/replay.json\")")]
     // /// the replay file to save
     // pub save_replay: String,
-
     #[argh(option, default = "500")]
     /// the tick rate in milliseconds
     pub tick_ms: u64,
@@ -115,10 +114,15 @@ fn main() {
         )
         .configure_sets(
             Update,
-            (TickSystemSet, CoreSystemsSet, ReplaySystemSet, GraphicsSystemSet)
+            (
+                TickSystemSet.run_if(should_tick),
+                (CoreSystemsSet, ReplaySystemSet)
+                    .chain()
+                    .run_if(resource_changed::<Tick>),
+                GraphicsSystemSet,
+            )
                 .chain()
-                .run_if(in_state(GameState::InGame))
-                .run_if(should_tick),
+                .run_if(in_state(GameState::InGame)),
         )
         .add_systems(
             Update,
@@ -173,7 +177,7 @@ pub fn camera_setup(mut commands: Commands) {
     commands.spawn((
         Camera2d,
         bevy_pancam::PanCam {
-            move_keys: bevy_pancam::DirectionKeys::arrows(),
+            move_keys: bevy_pancam::DirectionKeys::wasd(),
             grab_buttons: vec![MouseButton::Right, MouseButton::Left],
             min_scale: 0.25,
             max_scale: 5.0,

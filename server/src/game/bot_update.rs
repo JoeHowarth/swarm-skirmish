@@ -2,7 +2,7 @@ use bevy::{prelude::*, utils::HashMap};
 use dlopen2::wrapper::{Container, WrapperApi};
 use serde::{Deserialize, Serialize};
 use swarm_lib::{
-    bot_logger::BotLogger,
+    bot_logger::{BotLogger, LogEntry},
     known_map::{ClientBotData, KnownMap},
     Action,
     ActionResult,
@@ -38,8 +38,11 @@ struct BotLib(pub Container<Api>);
 #[derive(
     Component, Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize,
 )]
-#[require(CurrentAction, PastActions)]
+#[require(CurrentAction, PastActions, BotLogs)]
 pub struct BotId(pub u32);
+
+#[derive(Component, Default, Serialize, Deserialize, Clone)]
+pub struct BotLogs(pub Vec<LogEntry>);
 
 pub struct BotUpdatePlugin;
 
@@ -142,6 +145,7 @@ fn update_bots(
         &mut CurrentAction,
         &mut PastActions,
         &mut BotInstance,
+        &mut BotLogs,
     )>,
 ) {
     for (
@@ -151,6 +155,7 @@ fn update_bots(
         mut current_action,
         mut past_actions,
         mut bot_instance,
+        mut bot_logs,
     ) in query.iter_mut()
     {
         debug!(?bot_id, entity = entity.index(), "Updating bot");
@@ -185,7 +190,10 @@ fn update_bots(
             bot_data: bot_data.clone(),
         };
 
-        let maybe_action = bot_instance.bot.update(server_update.clone());
+        let (maybe_action, logs) =
+            bot_instance.bot.update(server_update.clone());
+
+        bot_logs.0 = logs;
 
         let Some(action) = maybe_action else {
             debug!("No action from bot ID: {}", bot_id.0);

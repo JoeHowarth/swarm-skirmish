@@ -1,6 +1,6 @@
 use std::{
     fs::File,
-    io::{BufRead, BufReader, BufWriter, Write},
+    io::{BufRead, BufReader, BufWriter, Read, Write},
 };
 
 use bevy::{ecs::entity::EntityHashMap, prelude::*, utils::HashMap};
@@ -10,7 +10,7 @@ use swarm_lib::BotData;
 use crate::{
     game::{
         apply_actions::{CurrentAction, PastActions},
-        bot_update::{BotId, BotIdToEntity},
+        bot_update::{BotId, BotIdToEntity, BotLogs},
     },
     graphics::tilemap::MapSize,
     types::*,
@@ -20,7 +20,6 @@ use crate::{
 #[derive(Clone, Serialize, Deserialize, Resource)]
 struct Replay {
     ticks: Vec<TickData>,
-    replay_entity_to_bot_id: EntityHashMap<BotId>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -31,11 +30,12 @@ struct TickData {
     partially_built_bots: EntityHashMap<PartiallyBuiltBot>,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Bundle)]
 struct BotComponents {
     bot_data: BotData,
     current_action: CurrentAction,
     past_actions: PastActions,
+    bot_logs: BotLogs,
 }
 
 pub struct ReplayPlugin {
@@ -70,10 +70,9 @@ impl Plugin for ReplayPlugin {
             app.insert_resource(replay.ticks[0].grid_world.clone());
             app.insert_resource(replay);
         } else {
-            app.insert_resource(Replay {
-                ticks: Vec::new(),
-                replay_entity_to_bot_id: EntityHashMap::default(),
-            });
+            clear_replay_files();
+
+            app.insert_resource(Replay { ticks: Vec::new() });
             app.insert_state(LiveOrReplay::Live);
         }
 
@@ -87,6 +86,7 @@ impl Plugin for ReplayPlugin {
         app.add_systems(
             Update,
             (extract_live_data, save_replay)
+                .chain()
                 .in_set(ReplaySystemSet)
                 .run_if(in_state(LiveOrReplay::Live)),
         );
@@ -94,23 +94,35 @@ impl Plugin for ReplayPlugin {
 }
 
 fn load_replay(path: &str) -> Replay {
-    let file = BufReader::new(File::open(path).unwrap());
+    let mut file = BufReader::new(File::open(path).unwrap());
 
-    let mut replay = Replay {
-        ticks: Vec::new(),
-        replay_entity_to_bot_id: EntityHashMap::default(),
-    };
+    let mut replay = Replay { ticks: Vec::new() };
 
-    for line in file.lines() {
-        let line = line.unwrap();
-        let tick_data: TickData = serde_json::from_str(&line).unwrap();
-        replay.ticks.push(tick_data);
+    // Continue reading more ticks if available
+    loop {
+        // Read the length bytes
+        let mut len_bytes = [0; 4];
+        if file.read_exact(&mut len_bytes).is_err() {
+            break;
+        }
+        let len = u32::from_le_bytes(len_bytes);
+
+        // Read the actual data
+        let mut bytes = vec![0; len as usize];
+        if file.read_exact(&mut bytes).is_err() {
+            break;
+        }
+
+        // Decode the data
+        match bincode::serde::decode_from_slice(
+            &bytes,
+            bincode::config::standard(),
+        ) {
+            Ok((tick_data, _)) => replay.ticks.push(tick_data),
+            Err(_) => break,
+        }
     }
 
-    let mapping_path = path.replace(".json", "_entity_to_live_entity.json");
-    let mut file = BufReader::new(File::open(mapping_path).unwrap());
-    replay.replay_entity_to_bot_id =
-        serde_json::from_reader(&mut file).unwrap();
     replay
 }
 
@@ -118,40 +130,60 @@ fn save_replay(replay: Res<Replay>) {
     let file = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
-        .open("replays/replay.json")
+        .open("replays/replay.bin")
         .unwrap();
     let mut file = BufWriter::new(file);
 
-    let bytes = serde_json::to_vec(&replay.ticks.last().unwrap()).unwrap();
-    file.write_all(&bytes).unwrap();
-    file.write_all(b"\n").unwrap();
-    file.flush().unwrap();
+    let bytes = bincode::serde::encode_to_vec(
+        &replay.ticks.last().unwrap(),
+        bincode::config::standard(),
+    )
+    .unwrap();
 
-    let mut file = BufWriter::new(
-        File::create("replays/replay_entity_to_live_entity.json").unwrap(),
-    );
-    serde_json::to_writer(&mut file, &replay.replay_entity_to_bot_id).unwrap();
+    let len = bytes.len() as u32;
+    file.write_all(&len.to_le_bytes()).unwrap();
+    file.write_all(&bytes).unwrap();
+    file.flush().unwrap();
+}
+
+fn clear_replay_files() {
+    let _ = std::fs::remove_file("replays/replay.bin");
 }
 
 fn extract_live_data(
     mut replay: ResMut<Replay>,
     tick: Res<Tick>,
-    bots: Query<(&BotId, &BotData, &CurrentAction, &PastActions)>,
+    mut bots: Query<(
+        &BotId,
+        &BotData,
+        &CurrentAction,
+        &PastActions,
+        &BotLogs,
+    )>,
     partially_built_bots: Query<(Entity, &PartiallyBuiltBot)>,
     grid_world: Res<GridWorld>,
 ) {
     let bot_data = bots
         .iter()
-        .map(|(&bot_id, bot_data, current_action, past_actions)| {
-            (
-                bot_id,
-                BotComponents {
-                    bot_data: bot_data.clone(),
-                    current_action: current_action.clone(),
-                    past_actions: past_actions.clone(),
-                },
-            )
-        })
+        .map(
+            |(
+                &bot_id,
+                bot_data,
+                current_action,
+                past_actions,
+                bot_logs,
+            )| {
+                (
+                    bot_id,
+                    BotComponents {
+                        bot_data: bot_data.clone(),
+                        current_action: current_action.clone(),
+                        past_actions: past_actions.clone(),
+                        bot_logs: bot_logs.clone(),
+                    },
+                )
+            },
+        )
         .collect();
 
     let partially_built_bots = partially_built_bots
@@ -178,7 +210,12 @@ fn restore_replay_at_tick(
     tick: Res<Tick>,
     replay: Res<Replay>,
     bot_id_to_entity: Res<BotIdToEntity>,
-    mut bots: Query<(&mut BotData, &mut CurrentAction, &mut PastActions)>,
+    mut bots: Query<(
+        &mut BotData,
+        &mut CurrentAction,
+        &mut PastActions,
+        &mut BotLogs,
+    )>,
     mut partially_built_bots: Query<&mut PartiallyBuiltBot>,
     mut replay_entity_to_live_entity: ResMut<ReplayEntityToLiveEntity>,
     mut grid_world: ResMut<GridWorld>,
@@ -195,8 +232,12 @@ fn restore_replay_at_tick(
 
         // If the entity exists in this bevy world, update the bot data
         let entity = bot_id_to_entity.0.get(bot_id);
-        if let Some((mut bot_data, mut current_action, mut past_actions)) =
-            entity.and_then(|entity| bots.get_mut(*entity).ok())
+        if let Some((
+            mut bot_data,
+            mut current_action,
+            mut past_actions,
+            mut bot_logs,
+        )) = entity.and_then(|entity| bots.get_mut(*entity).ok())
         {
             // Make sure the entity in the replay is mapped correctly to the
             // entity in this bevy world
@@ -211,17 +252,12 @@ fn restore_replay_at_tick(
             *bot_data = components.bot_data.clone();
             current_action.0 = components.current_action.0.clone();
             past_actions.0 = components.past_actions.0.clone();
+            bot_logs.0 = components.bot_logs.0.clone();
             continue;
         }
 
         // If the entity doesn't exist in this bevy world, spawn a new one
-        let live_entity = commands
-            .spawn((
-                components.bot_data.clone(),
-                components.current_action.clone(),
-                components.past_actions.clone(),
-            ))
-            .id();
+        let live_entity = commands.spawn(components.clone()).id();
 
         // Map the replay entity to the live entity
         replay_entity_to_live_entity

@@ -6,7 +6,7 @@ use std::ops::{ControlFlow, FromResidual, Try};
 
 use bevy_ecs::component::Component;
 pub use bevy_math;
-use bot_logger::BotLogger;
+use bot_logger::{BotLogger, LogEntry};
 
 pub mod bot_logger;
 pub mod gridworld;
@@ -24,7 +24,7 @@ use ustr::Ustr;
 pub type NewBotNoMangeFn = fn(logger: BotLogger) -> Box<dyn Bot>;
 
 pub trait Bot: Sync + Send + 'static {
-    fn update(&mut self, update: BotUpdate) -> Option<ActionWithId>;
+    fn update(&mut self, update: BotUpdate) -> (Option<ActionWithId>, Vec<LogEntry>);
 }
 
 #[derive(Debug, Clone, Component, Serialize, Deserialize)]

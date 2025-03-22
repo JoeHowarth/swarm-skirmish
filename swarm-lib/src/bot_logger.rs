@@ -6,9 +6,11 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+use serde::{Deserialize, Serialize};
+
 use crate::{BotUpdate, CellKind, RadarData, Team};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LogLevel {
     Debug,
     Info,
@@ -28,7 +30,7 @@ impl LogLevel {
 }
 
 /// A log entry from a bot
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LogEntry {
     pub bot_id: u32,
     pub tick: u32,
@@ -167,9 +169,9 @@ impl BotLogger {
     }
 
     /// Flush all buffered logs to stdout with appropriate headers
-    pub fn flush_buffer_to_stdout(&mut self) {
+    pub fn flush_buffer_to_stdout(&mut self) -> Vec<LogEntry> {
         if self.buffer.is_empty() {
-            return;
+            return Vec::new();
         }
 
         // Build the entire output as a single string to write at once
@@ -210,7 +212,8 @@ impl BotLogger {
         let _ = handle.flush();
 
         // Clear the buffer
-        self.buffer.clear();
+        let buffer = std::mem::take(&mut self.buffer);
+        buffer
     }
 
     pub fn log_debug_info(

@@ -1,8 +1,7 @@
-
 use rand::rngs::SmallRng;
 use strum::IntoDiscriminant;
 use swarm_lib::{
-    bot_logger::BotLogger,
+    bot_logger::{BotLogger, LogEntry},
     known_map::ClientBotData,
     Action,
     ActionWithId,
@@ -19,9 +18,9 @@ use swarm_lib::{
     Subsystems,
 };
 
-macro_rules! debug {
+macro_rules! info {
     ($self:expr, $($arg:tt)*) => {
-        $self.ctx.debug(format!($($arg)*))
+        $self.ctx.info(format!($($arg)*))
     }
 }
 
@@ -56,16 +55,19 @@ pub struct EconBot {
 }
 
 impl Bot for EconBot {
-    fn update(&mut self, update: BotUpdate) -> Option<ActionWithId> {
+    fn update(
+        &mut self,
+        update: BotUpdate,
+    ) -> (Option<ActionWithId>, Vec<LogEntry>) {
         self.ctx.set_tick(update.tick);
         self.ctx.log_debug_info(&update, 5);
 
         if self.role == EconBotRole::None {
             self.role = Self::determine_role(&update.bot_data);
-            debug!(self, "Determined role: {:?}", self.role);
+            info!(self, "Determined role: {:?}", self.role);
         }
 
-        debug!(
+        info!(
             self,
             "Inventory: {:?}, Energy: {}",
             update.bot_data.inventory,
@@ -73,7 +75,7 @@ impl Bot for EconBot {
         );
 
         let mut role = std::mem::take(&mut self.role);
-        let action = match &mut role {
+        let decision = match &mut role {
             EconBotRole::None => unreachable!(),
             EconBotRole::Base => self.base_behavior(&update),
             EconBotRole::Gatherer(state) => {
@@ -85,13 +87,11 @@ impl Bot for EconBot {
         };
         self.role = role;
 
-        self.ctx.flush_buffer_to_stdout();
-
         // Enrich action with id
-        match action {
+        let action = match decision {
             Act(action, reason) => {
                 self.action_counter += 1;
-                debug!(
+                info!(
                     self,
                     "Taking action: {:?} with id: {}, reason: {}",
                     action,
@@ -106,7 +106,10 @@ impl Bot for EconBot {
             }
             Wait => None,
             Continue => None,
-        }
+        };
+
+        let logs = self.ctx.flush_buffer_to_stdout();
+        (action, logs)
     }
 }
 
@@ -127,7 +130,7 @@ impl EconBot {
         self.wait_for_in_progress_action(&update.in_progress_action)?;
 
         let bot = &update.bot_data;
-        debug!(
+        info!(
             self,
             "Base checking inventory - Metal: {}, Energy: {}",
             bot.inventory.get(Item::Metal),
@@ -154,11 +157,11 @@ impl EconBot {
             .filter(|b| b.frame == FrameKind::Flea)
             .count();
 
-        debug!(self, "Current tractor count: {}", tractor_count);
+        info!(self, "Current tractor count: {}", tractor_count);
 
         if flea_count == 0 {
             if bot.inventory.get(Item::Metal) >= FrameKind::Flea.build_cost() {
-                debug!(
+                info!(
                     self,
                     "Base has enough metal ({}), building a flea with cargo \
                      bay",
@@ -183,13 +186,13 @@ impl EconBot {
             .filter(|b| b.subsystems.has(Subsystem::Generator))
             .count();
 
-        debug!(self, "Current generator count: {}", generator_count);
+        info!(self, "Current generator count: {}", generator_count);
 
         if generator_count == 0 {
             if bot.inventory.get(Item::Metal)
                 >= FrameKind::Building(BuildingKind::Small).build_cost()
             {
-                debug!(
+                info!(
                     self,
                     "Base has enough metal ({}), building a small building \
                      with generator",
@@ -212,7 +215,7 @@ impl EconBot {
         }
 
         if bot.inventory.get(Item::Metal) >= FrameKind::Tractor.build_cost() {
-            debug!(
+            info!(
                 self,
                 "Base has enough metal ({}), building a tractor with cargo \
                  bay and power cell",
@@ -231,7 +234,7 @@ impl EconBot {
             );
         }
 
-        debug!(
+        info!(
             self,
             "Base waiting for resources, current metal: {}",
             bot.inventory.get(Item::Metal)
@@ -247,7 +250,7 @@ impl EconBot {
         let bot = &update.bot_data;
         match state {
             GathererState::Idle => {
-                debug!(self, "Gatherer is idle, looking for a base");
+                info!(self, "Gatherer is idle, looking for a base");
 
                 let Some((target, _)) =
                     bot.known_map.find_nearby(bot.pos, 1000, |cell| {
@@ -268,10 +271,10 @@ impl EconBot {
                         pawn.frame == FrameKind::Building(BuildingKind::Small)
                     })
                 else {
-                    debug!(self, "In idle state, no base found, waiting");
+                    info!(self, "In idle state, no base found, waiting");
                     return Wait;
                 };
-                debug!(self, "Found base at {:?}", target);
+                info!(self, "Found base at {:?}", target);
                 *state = GathererState::Gathering { base: target };
                 return self.gatherer_behavior(state, update);
             }
@@ -291,7 +294,7 @@ impl EconBot {
         // next to base and has metal => Transfer
         if bot.inventory.has(Item::Metal) && bot.pos.is_adjacent(base) {
             let dir = bot.pos.dir_to(base).unwrap();
-            debug!(
+            info!(
                 self,
                 "Next to base with metal, transferring in direction: {:?}", dir
             );
@@ -303,7 +306,7 @@ impl EconBot {
 
         // full => return to base to unload
         if bot.inventory.size() == bot.inventory.capacity {
-            debug!(
+            info!(
                 self,
                 "Inventory full ({}/{}), returning to base",
                 bot.inventory.size(),
@@ -320,7 +323,7 @@ impl EconBot {
             bot.known_map
                 .find_nearby(bot.pos, 50, |cell| cell.item == Some(Item::Metal))
         {
-            debug!(self, "Found metal at {:?}", target);
+            info!(self, "Found metal at {:?}", target);
             return self.move_and_act(
                 bot,
                 target,
@@ -335,7 +338,7 @@ impl EconBot {
 
         // has metal => return to base to unload
         if bot.inventory.has(Item::Metal) {
-            debug!(
+            info!(
                 self,
                 "Has metal ({}), returning to base",
                 bot.inventory.get(Item::Metal)
@@ -355,7 +358,7 @@ impl EconBot {
         let bot = &update.bot_data;
         match state {
             ExplorerState::Idle => {
-                debug!(self, "Explorer is idle");
+                info!(self, "Explorer is idle");
                 Wait
             }
             ExplorerState::Exploring { base } => {
@@ -366,7 +369,7 @@ impl EconBot {
                 // Return to base
                 let distance = bot.pos.manhattan_distance(base);
                 if distance > 10 {
-                    debug!(
+                    info!(
                         self,
                         "Explorer has nothing to do, returning to base ",
                     );
@@ -394,12 +397,12 @@ impl EconBot {
                 .find_nearby(bot.pos, max_distance, |cell| cell.is_unknown());
 
         if let Some((target, _)) = unknown_cell {
-            debug!(self, "Found unknown cell at {:?}", target);
+            info!(self, "Found unknown cell at {:?}", target);
             if let Some(path) = bot.known_map.find_path(bot.pos, target) {
                 return Act(Action::MoveTo(path), "Exploring");
             }
         } else {
-            debug!(self, "No unknown cells found within range");
+            info!(self, "No unknown cells found within range");
         }
 
         Continue
@@ -414,7 +417,7 @@ impl EconBot {
                 let Some((base, _)) = self.find_bot(bot, 1000, |b| {
                     b.frame == FrameKind::Building(BuildingKind::Small)
                 }) else {
-                    debug!(self, "No recharge base found, continuing");
+                    info!(self, "No recharge base found, continuing");
                     return Continue;
                 };
                 base
@@ -427,7 +430,7 @@ impl EconBot {
 
         if energy_level < max_energy {
             if let Some(dir) = bot.pos.dir_to(&base) {
-                debug!(
+                info!(
                     self,
                     "Adjacent to base, recharging. Energy: {}/{}",
                     energy_level,
@@ -441,7 +444,7 @@ impl EconBot {
             if energy_level < 50
                 || distance_to_base + 10 > energy_level as usize
             {
-                debug!(
+                info!(
                     self,
                     "Low energy: {}/{}, distance to base: {}, moving to base",
                     energy_level,
@@ -468,7 +471,7 @@ impl EconBot {
         reason: &'static str,
     ) -> DecisionResult {
         if let Some(dir) = bot.pos.dir_to(&target) {
-            debug!(
+            info!(
                 self,
                 "Adjacent to target {:?}, taking action in direction: {:?}",
                 target,
@@ -477,7 +480,7 @@ impl EconBot {
             return Act(action(dir), reason);
         }
         if let Some(path) = bot.known_map.find_path_adj(bot.pos, target) {
-            debug!(
+            info!(
                 self,
                 "Moving to target {:?}, path length: {}",
                 target,
@@ -486,7 +489,7 @@ impl EconBot {
             return Act(Action::MoveTo(path), reason);
         }
 
-        debug!(self, "Cannot find path to target {:?}", target);
+        info!(self, "Cannot find path to target {:?}", target);
         Continue
     }
 
@@ -497,7 +500,7 @@ impl EconBot {
         let Some(in_progress_action) = &in_progress_action else {
             return Continue;
         };
-        debug!(
+        info!(
             self,
             "Waiting for in_progress_action to complete: {:?} {:?}",
             in_progress_action.id,
@@ -551,7 +554,7 @@ fn existing_path_contains_pos(
     };
 
     if path.contains(&pos) {
-        ctx.debug(format!(
+        ctx.info(format!(
             "Waiting for in_progress_action to complete: \
              {in_progress_action:?}"
         ));

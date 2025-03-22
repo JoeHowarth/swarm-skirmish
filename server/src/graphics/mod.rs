@@ -3,7 +3,6 @@ use render_bots::{RenderBotsPlugin, RenderBotsSystemSet};
 use swarm_lib::Team;
 use tilemap::{TilemapPlugin, TilemapSystemSimUpdateSet};
 
-
 pub mod interaction;
 pub mod render_bots;
 pub mod tilemap;
@@ -50,21 +49,6 @@ pub fn load_tileset(
     asset_server: Res<AssetServer>,
     mut atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
 ) {
-    // Load the image data
-    // let image_bytes = include_bytes!("../assets/ascii.png");
-    // let dynamic_image = image::load_from_memory(image_bytes).unwrap();
-
-    // let processed_image = process_magenta_to_black(dynamic_image);
-
-    // // Convert to Bevy Image
-    // let ascii_image = Image::from_dynamic(
-    //     processed_image,
-    //     true,
-    //     RenderAssetUsages::default(),
-    // );
-
-    // Store the atlas layout as a resource
-    // let ascii_texture = images.add(ascii_image);
     let terrain_texture: Handle<Image> = asset_server.load("Terrain.png");
     let fog_of_war_texture: Handle<Image> = asset_server.load("FogOfWar.png");
 

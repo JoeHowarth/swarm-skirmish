@@ -2,7 +2,7 @@ use std::fmt;
 
 use rand::{rngs::SmallRng, Rng};
 use swarm_lib::{
-    bot_logger::BotLogger,
+    bot_logger::{BotLogger, LogEntry},
     known_map::{ClientBotData, KnownMap},
     Action,
     ActionWithId,
@@ -12,7 +12,7 @@ use swarm_lib::{
     CellStateRadar,
     DecisionResult::{self, Act, Continue, Wait},
     Dir,
-    Item::{*},
+    Item::*,
     Pos,
 };
 
@@ -192,22 +192,23 @@ impl InterruptBot {
 }
 
 impl Bot for InterruptBot {
-    fn update(&mut self, update: BotUpdate) -> Option<ActionWithId> {
+    fn update(
+        &mut self,
+        update: BotUpdate,
+    ) -> (Option<ActionWithId>, Vec<LogEntry>) {
         self.ctx.set_tick(update.tick);
         self.ctx.log_debug_info(&update, 1);
 
         // Determine the next action using a linear decision flow
-        let action = self.determine_next_action(
+        let decision = self.determine_next_action(
             update.bot_data.pos,
             &update.bot_data.known_map,
             update.in_progress_action,
         );
 
-        self.ctx.flush_buffer_to_stdout();
-
         // Enrich action with id
         self.action_counter += 1;
-        match action {
+        let action = match decision {
             Act(action, reason) => Some(ActionWithId {
                 id: self.action_counter,
                 action,
@@ -215,7 +216,10 @@ impl Bot for InterruptBot {
             }),
             Wait => None,
             Continue => None,
-        }
+        };
+
+        let logs = self.ctx.flush_buffer_to_stdout();
+        (action, logs)
     }
 }
 

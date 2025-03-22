@@ -1,6 +1,6 @@
 use rand::{rngs::SmallRng, Rng};
 use swarm_lib::{
-    bot_logger::BotLogger,
+    bot_logger::{BotLogger, LogEntry},
     gridworld::PassableCell,
     known_map::{ClientBotData, KnownMap},
     Action,
@@ -9,7 +9,7 @@ use swarm_lib::{
     BotUpdate,
     CellStateRadar,
     Dir,
-    Item::{*},
+    Item::*,
     Pos,
 };
 
@@ -142,7 +142,10 @@ impl CrumbFollower {
 }
 
 impl Bot for CrumbFollower {
-    fn update(&mut self, update: BotUpdate) -> Option<ActionWithId> {
+    fn update(
+        &mut self,
+        update: BotUpdate,
+    ) -> (Option<ActionWithId>, Vec<LogEntry>) {
         self.ctx.set_tick(update.tick);
         self.ctx.log_debug_info(&update, 1);
 
@@ -151,7 +154,7 @@ impl Bot for CrumbFollower {
                 "Previous action still in progress, waiting... Action: \
                  {action:?}"
             ));
-            return None;
+            return (None, Vec::new());
         }
 
         // Determine the next action using a linear decision flow
@@ -161,14 +164,17 @@ impl Bot for CrumbFollower {
             update.tick,
         );
 
-        self.ctx.flush_buffer_to_stdout();
+        let logs = self.ctx.flush_buffer_to_stdout();
 
         // Build and send response with movement action
         self.action_counter += 1;
-        Some(ActionWithId {
-            id: self.action_counter,
-            action,
-            reason,
-        })
+        (
+            Some(ActionWithId {
+                id: self.action_counter,
+                action,
+                reason,
+            }),
+            logs,
+        )
     }
 }
