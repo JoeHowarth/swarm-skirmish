@@ -19,11 +19,15 @@ use crate::{
 };
 
 /// High-level action queue with actions sent in from bots
-#[derive(Component, Clone, Default, Deref, DerefMut, Serialize, Deserialize)]
+#[derive(
+    Component, Clone, Default, Deref, DerefMut, Serialize, Deserialize,
+)]
 pub struct CurrentAction(pub Option<ActionContainer>);
 
 /// Past actions that have been applied
-#[derive(Component, Clone, Default, Deref, DerefMut, Serialize, Deserialize)]
+#[derive(
+    Component, Clone, Default, Deref, DerefMut, Serialize, Deserialize,
+)]
 pub struct PastActions(pub Vec<ActionResult>);
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -372,8 +376,8 @@ fn apply_actions(
         bot_data.energy = (bot_data.energy - kind.energy_per_tick()).unwrap();
 
         let status = apply_action_inner(
-            &bot_id,
-            &kind,
+            bot_id,
+            kind,
             state,
             entity,
             &mut bot_data,
@@ -485,14 +489,12 @@ fn apply_action_inner(
                     // Spawn partially built bot
                     let partially_built_e = commands
                         .spawn(PartiallyBuiltBot {
-                            frame_kind: frame_kind.clone(),
+                            frame_kind: *frame_kind,
                             subsystems: subsystems.clone(),
                             pos: target_pos,
                             team: bot.team,
-                            ticks_remaining: kind.ticks_to_complete().unwrap()
-                                as u32,
-                            _ticks_required: kind.ticks_to_complete().unwrap()
-                                as u32,
+                            ticks_remaining: kind.ticks_to_complete().unwrap(),
+                            _ticks_required: kind.ticks_to_complete().unwrap(),
                         })
                         .id();
                     // Update grid world

@@ -113,7 +113,7 @@ impl CrumbFollower {
         if let Some((pos, _)) = unknown_cells {
             self.ctx.debug(format!(
                 "Found random unexplored cell at position: {}",
-                Pos::from(pos)
+                pos
             ));
 
             if let Some(path) = map.find_path(curr_pos, pos) {

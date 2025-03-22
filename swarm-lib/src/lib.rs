@@ -24,7 +24,10 @@ use ustr::Ustr;
 pub type NewBotNoMangeFn = fn(logger: BotLogger) -> Box<dyn Bot>;
 
 pub trait Bot: Sync + Send + 'static {
-    fn update(&mut self, update: BotUpdate) -> (Option<ActionWithId>, Vec<LogEntry>);
+    fn update(
+        &mut self,
+        update: BotUpdate,
+    ) -> (Option<ActionWithId>, Vec<LogEntry>);
 }
 
 #[derive(Debug, Clone, Component, Serialize, Deserialize)]
@@ -137,7 +140,9 @@ impl BotData {
     }
 }
 
-#[derive(Default, Display, Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    Default, Display, Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize,
+)]
 pub enum FrameKind {
     #[default]
     Flea,
@@ -227,7 +232,9 @@ impl std::fmt::Debug for Subsystems {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize,
+)]
 pub enum BuildingKind {
     #[default]
     Small,
@@ -281,7 +288,15 @@ pub struct ActionResult {
     pub completed_tick: u32,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, strum_macros::EnumDiscriminants, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    strum_macros::EnumDiscriminants,
+    Serialize,
+    Deserialize,
+)]
 pub enum ActionStatus {
     Success,
     Failure(String),

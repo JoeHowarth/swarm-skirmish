@@ -28,7 +28,9 @@ pub struct PartiallyBuiltBot {
     pub ticks_remaining: u32,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize,
+)]
 pub struct CellState {
     pub kind: CellKind,
     pub partially_built_bot: Option<Entity>,

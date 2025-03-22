@@ -212,8 +212,8 @@ impl BotLogger {
         let _ = handle.flush();
 
         // Clear the buffer
-        let buffer = std::mem::take(&mut self.buffer);
-        buffer
+        
+        std::mem::take(&mut self.buffer)
     }
 
     pub fn log_debug_info(

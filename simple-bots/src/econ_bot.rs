@@ -276,7 +276,7 @@ impl EconBot {
                 };
                 info!(self, "Found base at {:?}", target);
                 *state = GathererState::Gathering { base: target };
-                return self.gatherer_behavior(state, update);
+                self.gatherer_behavior(state, update)
             }
             GathererState::Gathering { base } => {
                 self.ensure_energy(bot)?;
@@ -506,7 +506,7 @@ impl EconBot {
             in_progress_action.id,
             in_progress_action.action.discriminant()
         );
-        return Wait;
+        Wait
     }
 
     fn find_bot<'a>(

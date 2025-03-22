@@ -225,7 +225,7 @@ fn update_bots(
 
         // If there is a current action already, cancel it
         if let Some(action) =
-            std::mem::replace(&mut current_action.0, Some(action_container))
+            current_action.0.replace(action_container)
         {
             past_actions.push(ActionResult {
                 action: action.kind,

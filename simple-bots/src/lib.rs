@@ -1,11 +1,7 @@
 #![allow(unused_imports, dead_code)]
 
 use rand::{rngs::SmallRng, SeedableRng};
-use swarm_lib::{
-    bot_logger::BotLogger,
-    Bot,
-    NewBotNoMangeFn,
-};
+use swarm_lib::{bot_logger::BotLogger, Bot, NewBotNoMangeFn};
 
 mod econ_bot;
 mod old;

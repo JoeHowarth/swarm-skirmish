@@ -10,7 +10,7 @@ use crate::Subsystem;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Inventory {
-    pub items_table: U8Table<{ Item::COUNT as usize }, Item>,
+    pub items_table: U8Table<{ Item::COUNT }, Item>,
     pub capacity: u8,
 }
 
@@ -113,7 +113,7 @@ impl Inventory {
 }
 
 impl Deref for Inventory {
-    type Target = U8Table<{ Item::COUNT as usize }, Item>;
+    type Target = U8Table<{ Item::COUNT }, Item>;
 
     fn deref(&self) -> &Self::Target {
         &self.items_table
@@ -137,7 +137,7 @@ impl std::fmt::Debug for Inventory {
 }
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Subsystems(pub U8Table<{ Subsystem::COUNT as usize }, Subsystem>);
+pub struct Subsystems(pub U8Table<{ Subsystem::COUNT }, Subsystem>);
 
 impl Subsystems {
     pub fn new(items: impl IntoIterator<Item = (Subsystem, u8)>) -> Self {
@@ -150,7 +150,7 @@ impl Subsystems {
 }
 
 impl Deref for Subsystems {
-    type Target = U8Table<{ Subsystem::COUNT as usize }, Subsystem>;
+    type Target = U8Table<{ Subsystem::COUNT }, Subsystem>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -366,7 +366,7 @@ impl Pos {
     pub fn manhattan_distance(&self, other: &Pos) -> usize {
         let (x1, y1) = self.as_isize();
         let (x2, y2) = other.as_isize();
-        (x1 - x2).abs() as usize + (y1 - y2).abs() as usize
+        (x1 - x2).unsigned_abs() + (y1 - y2).unsigned_abs()
     }
 
     pub fn is_adjacent(&self, other: &Pos) -> bool {

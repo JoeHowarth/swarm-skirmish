@@ -125,7 +125,7 @@ impl<CellState: PassableCell> GridWorld<CellState> {
                 {
                     positions.push((
                         Pos((x as usize, y as usize)),
-                        dist as isize,
+                        dist,
                         1, // North-East quadrant
                     ));
                 }
@@ -140,7 +140,7 @@ impl<CellState: PassableCell> GridWorld<CellState> {
                 {
                     positions.push((
                         Pos((x as usize, y as usize)),
-                        dist as isize,
+                        dist,
                         2, // South-East quadrant
                     ));
                 }
@@ -155,7 +155,7 @@ impl<CellState: PassableCell> GridWorld<CellState> {
                 {
                     positions.push((
                         Pos((x as usize, y as usize)),
-                        dist as isize,
+                        dist,
                         3, // South-West quadrant
                     ));
                 }
@@ -170,7 +170,7 @@ impl<CellState: PassableCell> GridWorld<CellState> {
                 {
                     positions.push((
                         Pos((x as usize, y as usize)),
-                        dist as isize,
+                        dist,
                         4, // North-West quadrant
                     ));
                 }
@@ -536,8 +536,8 @@ mod tests {
         let manhattan_distances: Vec<_> = positions
             .iter()
             .map(|pos| {
-                let dx = (pos.x() as isize - 2).abs() as usize;
-                let dy = (pos.y() as isize - 2).abs() as usize;
+                let dx = (pos.x() as isize - 2).unsigned_abs();
+                let dy = (pos.y() as isize - 2).unsigned_abs();
                 dx + dy
             })
             .collect();

@@ -75,15 +75,8 @@ fn toggle_logs(
 
 const NORMAL_BUTTON: Color = Color::srgb(0.15, 0.15, 0.15);
 
-fn spawn_logs_view<'a>(
-    mut commands: Commands,
-    logs: &[LogEntry],
-    // text: impl IntoIterator<Item = Cow<'a, str>>,
-) -> Entity {
-    let logs = logs.iter().filter(|log| log.level == LogLevel::Info);
-
-    // let container = commands.spawn(container_node).id();
-    let container = commands
+fn spawn_logs_view(mut commands: Commands, logs: &[LogEntry]) {
+    commands
         .spawn((
             Node {
                 width: Val::Px(300.0),
@@ -105,6 +98,7 @@ fn spawn_logs_view<'a>(
             LogsTextContainer,
         ))
         .with_children(|parent| {
+            let logs = logs.iter().filter(|log| log.level == LogLevel::Info);
             let button_text_color = TextColor(Color::srgb(0.9, 0.9, 0.9));
             let button_text_font = TextFont {
                 font_size: 12.0,
@@ -122,9 +116,7 @@ fn spawn_logs_view<'a>(
                     button_text_font.clone(),
                 ));
             }
-        })
-        .id();
-    container
+        });
 }
 
 fn handle_selection(selected: Res<Selected>, mut map_mode: ResMut<MapMode>) {

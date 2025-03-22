@@ -135,7 +135,7 @@ fn save_replay(replay: Res<Replay>) {
     let mut file = BufWriter::new(file);
 
     let bytes = bincode::serde::encode_to_vec(
-        &replay.ticks.last().unwrap(),
+        replay.ticks.last().unwrap(),
         bincode::config::standard(),
     )
     .unwrap();
@@ -153,26 +153,14 @@ fn clear_replay_files() {
 fn extract_live_data(
     mut replay: ResMut<Replay>,
     tick: Res<Tick>,
-    mut bots: Query<(
-        &BotId,
-        &BotData,
-        &CurrentAction,
-        &PastActions,
-        &BotLogs,
-    )>,
+    bots: Query<(&BotId, &BotData, &CurrentAction, &PastActions, &BotLogs)>,
     partially_built_bots: Query<(Entity, &PartiallyBuiltBot)>,
     grid_world: Res<GridWorld>,
 ) {
     let bot_data = bots
         .iter()
         .map(
-            |(
-                &bot_id,
-                bot_data,
-                current_action,
-                past_actions,
-                bot_logs,
-            )| {
+            |(&bot_id, bot_data, current_action, past_actions, bot_logs)| {
                 (
                     bot_id,
                     BotComponents {

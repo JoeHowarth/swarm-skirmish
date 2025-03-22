@@ -164,7 +164,7 @@ fn render_bots(
                 update_text_labels(
                     children,
                     &mut bot_action_labels,
-                    get_reason(&current_tick, &current_action, &past_actions)
+                    get_reason(&current_tick, current_action, past_actions)
                         .unwrap_or_default()
                         .to_owned(),
                     format!("E: {}", bot_data.energy.0),
@@ -219,8 +219,8 @@ fn render_bots(
                     (
                         get_reason(
                             &current_tick,
-                            &current_action,
-                            &past_actions,
+                            current_action,
+                            past_actions,
                         )
                         .unwrap_or_default()
                         .to_owned(),
