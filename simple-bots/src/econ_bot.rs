@@ -36,35 +36,6 @@ pub enum EconBotRole {
     Explorer(ExplorerState),
 }
 
-impl EconBotRole {
-    // /// Returns a mutable reference to the base state.
-    // /// Panics if the role is not Base.
-    // pub fn base(&mut self) -> &mut BaseState {
-    //     match self {
-    //         EconBotRole::Base(Some(state)) => state,
-    //         _ => unreachable!(),
-    //     }
-    // }
-
-    // /// Returns a mutable reference to the gatherer state.
-    // /// Panics if the role is not Gatherer.
-    // pub fn gatherer(&mut self) -> &mut GathererState {
-    //     match self {
-    //         EconBotRole::Gatherer(Some(state)) => state,
-    //         _ => unreachable!(),
-    //     }
-    // }
-
-    // /// Returns a mutable reference to the explorer state.
-    // /// Panics if the role is not Explorer.
-    // pub fn explorer(&mut self) -> &mut ExplorerState {
-    //     match self {
-    //         EconBotRole::Explorer(Some(state)) => state,
-    //         _ => unreachable!(),
-    //     }
-    // }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BaseState {
     /// Map of bot id to tick of last shared map
@@ -648,7 +619,6 @@ impl EconBot {
     ) -> Option<&'a ClientBotData> {
         let mut found = None;
         bot.known_map.find_nearby(bot.pos, max_distance, |cell| {
-            //
             let Some(pawn_id) = cell.pawn else {
                 return false;
             };
