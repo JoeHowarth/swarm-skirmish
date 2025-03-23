@@ -67,7 +67,7 @@ fn main() {
         }
         _ => (500.0, 500.0),
     };
-    let res = (res.0 + 2.0, res.1 + 2.0);
+    let res = (res.0.min(2231.0) + 2.0, res.1.min(1485.0) + 2.0);
 
     App::new()
         .add_plugins((

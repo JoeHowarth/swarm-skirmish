@@ -16,7 +16,7 @@ pub mod types;
 
 use known_map::{ClientBotData, KnownMap};
 pub use radar::*;
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use strum_macros::{Display, EnumCount, EnumDiscriminants, FromRepr};
 pub use types::*;
 use ustr::Ustr;
@@ -36,6 +36,7 @@ pub struct BotData {
     pub subsystems: Subsystems,
     pub energy: Energy,
     pub inventory: Inventory,
+    pub msg_buffer: Vec<(Vec<u8>, u32)>,
     pub pos: Pos,
     pub team: Team,
     pub known_map: KnownMap,
@@ -73,6 +74,8 @@ pub enum Action {
     Transfer((Item, Dir)),
     Build(Dir, FrameKind, Subsystems),
     Recharge(Dir),
+    Msg { msg: Vec<u8>, to: u32 },
+    ShareMap { with: u32 },
     Attack(Dir),
 }
 
@@ -97,6 +100,7 @@ impl BotData {
             frame: frame_kind,
             energy,
             inventory: Inventory::new(subsystems.get(Subsystem::CargoBay), []),
+            msg_buffer: Vec::new(),
             subsystems,
             pos,
             team,
@@ -136,6 +140,8 @@ impl BotData {
             }
             Action::Recharge(_dir) => true,
             Action::Attack(_dir) => self.subsystems.has(Subsystem::PlasmaRifle),
+            Action::Msg { .. } => true,
+            Action::ShareMap { .. } => true,
         }
     }
 }
@@ -241,6 +247,20 @@ pub enum BuildingKind {
 }
 
 impl Action {
+    pub fn msg_from(msg: impl Serialize, to: u32) -> Self {
+        Self::Msg {
+            msg: serde_json::to_vec(&msg).unwrap(),
+            to,
+        }
+    }
+
+    pub fn msg_from_str(msg: String, to: u32) -> Self {
+        Self::Msg {
+            msg: msg.into_bytes(),
+            to,
+        }
+    }
+
     pub fn ticks_to_complete(&self) -> Option<u32> {
         match self {
             Action::MoveDir(_) => Some(1),
@@ -260,6 +280,8 @@ impl Action {
             }
             Action::Recharge(_dir) => None,
             Action::Attack(_) => Some(1),
+            Action::Msg { .. } => Some(1),
+            Action::ShareMap { .. } => Some(1),
         }
     }
 
@@ -275,6 +297,8 @@ impl Action {
             Action::Build(_dir, _frame_kind, _subsystems) => 2.into(),
             Action::Recharge(_dir) => 0.into(),
             Action::Attack(_) => 4.into(),
+            Action::Msg { .. } => 1.into(),
+            Action::ShareMap { .. } => 1.into(),
         }
     }
 }

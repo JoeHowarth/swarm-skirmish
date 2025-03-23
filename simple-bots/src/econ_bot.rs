@@ -1,8 +1,11 @@
+use std::collections::HashMap;
+
 use rand::rngs::SmallRng;
 use strum::IntoDiscriminant;
 use swarm_lib::{
     bot_logger::{BotLogger, LogEntry},
-    known_map::ClientBotData,
+    gridworld::PassableCell,
+    known_map::{ClientBotData, KnownMap},
     Action,
     ActionWithId,
     Bot,
@@ -28,29 +31,62 @@ macro_rules! info {
 pub enum EconBotRole {
     #[default]
     None,
-    Base,
+    Base(BaseState),
     Gatherer(GathererState),
     Explorer(ExplorerState),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum GathererState {
-    Idle,
-    Gathering { base: Pos },
+impl EconBotRole {
+    // /// Returns a mutable reference to the base state.
+    // /// Panics if the role is not Base.
+    // pub fn base(&mut self) -> &mut BaseState {
+    //     match self {
+    //         EconBotRole::Base(Some(state)) => state,
+    //         _ => unreachable!(),
+    //     }
+    // }
+
+    // /// Returns a mutable reference to the gatherer state.
+    // /// Panics if the role is not Gatherer.
+    // pub fn gatherer(&mut self) -> &mut GathererState {
+    //     match self {
+    //         EconBotRole::Gatherer(Some(state)) => state,
+    //         _ => unreachable!(),
+    //     }
+    // }
+
+    // /// Returns a mutable reference to the explorer state.
+    // /// Panics if the role is not Explorer.
+    // pub fn explorer(&mut self) -> &mut ExplorerState {
+    //     match self {
+    //         EconBotRole::Explorer(Some(state)) => state,
+    //         _ => unreachable!(),
+    //     }
+    // }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ExplorerState {
-    Idle,
-    Exploring { base: Pos },
+pub struct BaseState {
+    /// Map of bot id to tick of last shared map
+    pub last_shared_map: HashMap<u32, u32>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GathererState {
+    pub last_shared_map_tick: u32,
+    pub base: Pos,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExplorerState {
+    pub last_shared_map_tick: u32,
+    pub base: Pos,
 }
 
 pub struct EconBot {
     pub ctx: BotLogger,
     pub rng: SmallRng,
     pub action_counter: u32,
-    // pub grid: GridWorld<ClientCellState>,
-    // pub seen_bots: Vec<ClientBotData>,
     pub role: EconBotRole,
 }
 
@@ -63,7 +99,7 @@ impl Bot for EconBot {
         self.ctx.log_debug_info(&update, 5);
 
         if self.role == EconBotRole::None {
-            self.role = Self::determine_role(&update.bot_data);
+            self.role = Self::determine_role(&update.bot_data, &update);
             info!(self, "Determined role: {:?}", self.role);
         }
 
@@ -77,7 +113,7 @@ impl Bot for EconBot {
         let mut role = std::mem::take(&mut self.role);
         let decision = match &mut role {
             EconBotRole::None => unreachable!(),
-            EconBotRole::Base => self.base_behavior(&update),
+            EconBotRole::Base(state) => self.base_behavior(state, &update),
             EconBotRole::Gatherer(state) => {
                 self.gatherer_behavior(state, &update)
             }
@@ -114,19 +150,29 @@ impl Bot for EconBot {
 }
 
 impl EconBot {
-    fn determine_role(bot_data: &BotData) -> EconBotRole {
+    fn determine_role(bot_data: &BotData, update: &BotUpdate) -> EconBotRole {
         if matches!(bot_data.frame, FrameKind::Building(_)) {
-            return EconBotRole::Base;
+            return EconBotRole::Base(Self::init_base_state(update));
         }
 
         if bot_data.subsystems.has(Subsystem::CargoBay) {
-            return EconBotRole::Gatherer(GathererState::Idle);
+            return EconBotRole::Gatherer(Self::init_gatherer_state(update));
         }
 
-        EconBotRole::Explorer(ExplorerState::Idle)
+        EconBotRole::Explorer(Self::init_explorer_state(update))
     }
 
-    fn base_behavior(&mut self, update: &BotUpdate) -> DecisionResult {
+    fn init_base_state(_update: &BotUpdate) -> BaseState {
+        BaseState {
+            last_shared_map: HashMap::new(),
+        }
+    }
+
+    fn base_behavior(
+        &mut self,
+        state: &mut BaseState,
+        update: &BotUpdate,
+    ) -> DecisionResult {
         self.wait_for_in_progress_action(&update.in_progress_action)?;
 
         let bot = &update.bot_data;
@@ -138,13 +184,15 @@ impl EconBot {
         );
 
         if bot.energy.0 < 10 && !bot.subsystems.has(Subsystem::Generator) {
-            if let Some((pos, _)) = self
+            if let Some(bot) = self
                 .find_bot(bot, 1, |b| b.subsystems.has(Subsystem::Generator))
             {
-                let dir = bot.pos.dir_to(&pos).unwrap();
+                let dir = bot.pos.dir_to(&bot.pos).unwrap();
                 return Act(Action::Recharge(dir), "Recharging");
             }
         }
+
+        self.decide_base_map_sharing(state, update)?;
 
         let tractor_count = bot
             .known_bots
@@ -188,7 +236,7 @@ impl EconBot {
 
         info!(self, "Current generator count: {}", generator_count);
 
-        if generator_count == 0 {
+        if generator_count <= 1 {
             if bot.inventory.get(Item::Metal)
                 >= FrameKind::Building(BuildingKind::Small).build_cost()
             {
@@ -198,9 +246,16 @@ impl EconBot {
                      with generator",
                     bot.inventory.get(Item::Metal)
                 );
+                let Some(dir) =
+                    bot.known_map.find_adj(bot.pos, |cell| !cell.is_blocked())
+                else {
+                    info!(self, "No valid direction to build generator");
+                    return Wait;
+                };
+
                 return Act(
                     Action::Build(
-                        Dir::Right,
+                        dir,
                         FrameKind::Building(BuildingKind::Small),
                         Subsystems::new([
                             (Subsystem::Generator, 1),
@@ -242,52 +297,107 @@ impl EconBot {
         Wait
     }
 
+    fn decide_base_map_sharing(
+        &mut self,
+        state: &mut BaseState,
+        update: &BotUpdate,
+    ) -> DecisionResult {
+        let bot = &update.bot_data;
+        let current_tick = update.tick;
+        let recently_seen_bots = bot.known_bots.iter().filter(|b| {
+            current_tick - b.last_observed < 1
+                && b.bot_id != self.ctx.bot_id
+                && Some(b.bot_id) != bot.known_map.last_received_map_from
+        });
+
+        let eligible_for_share = recently_seen_bots.filter(|b| {
+            state
+                .last_shared_map
+                .get(&b.bot_id)
+                // If the bot has not been shared with recently
+                // it is eligible
+                .map(|tick| current_tick - tick > 30)
+                // If the bot has not been shared with before, it is eligible
+                .unwrap_or(true)
+        });
+
+        let Some(bot_to_share_with) =
+            eligible_for_share.min_by_key(|b| b.last_observed)
+        else {
+            return Continue;
+        };
+
+        info!(
+            self,
+            "Sharing map with bot {:?}, last shared map tick: {:?}",
+            bot_to_share_with.bot_id,
+            state.last_shared_map.get(&bot_to_share_with.bot_id)
+        );
+
+        // Update last shared map
+        state
+            .last_shared_map
+            .insert(bot_to_share_with.bot_id, current_tick);
+
+        return Act(
+            Action::ShareMap {
+                with: bot_to_share_with.bot_id,
+            },
+            "Sharing map",
+        );
+    }
+
+    fn init_gatherer_state(update: &BotUpdate) -> GathererState {
+        let bot = &update.bot_data;
+        let target = Self::find_base(bot).expect("No base found");
+        GathererState {
+            last_shared_map_tick: update.tick,
+            base: target,
+        }
+    }
+
+    fn find_base(bot: &BotData) -> Option<Pos> {
+        bot.known_map
+            .find_nearby(bot.pos, 1000, |cell| {
+                let Some(pawn_id) = cell.pawn else {
+                    return false;
+                };
+
+                let pawn = bot
+                    .known_bots
+                    .iter()
+                    .find(|b| b.bot_id == pawn_id)
+                    .expect("Grid pawn not found in seen bots");
+
+                println!(
+                    "Cell has pawn {:?} with frame {:?}",
+                    pawn.bot_id, pawn.frame
+                );
+                pawn.frame == FrameKind::Building(BuildingKind::Small)
+            })
+            .map(|(pos, _)| pos)
+    }
+
     fn gatherer_behavior(
         &mut self,
         state: &mut GathererState,
         update: &BotUpdate,
     ) -> DecisionResult {
         let bot = &update.bot_data;
-        match state {
-            GathererState::Idle => {
-                info!(self, "Gatherer is idle, looking for a base");
 
-                let Some((target, _)) =
-                    bot.known_map.find_nearby(bot.pos, 1000, |cell| {
-                        let Some(pawn_id) = cell.pawn else {
-                            return false;
-                        };
+        self.ensure_energy(bot)?;
 
-                        let pawn = bot
-                            .known_bots
-                            .iter()
-                            .find(|b| b.bot_id == pawn_id)
-                            .expect("Grid pawn not found in seen bots");
+        self.decide_pawn_map_sharing(
+            &mut state.last_shared_map_tick,
+            &state.base,
+            update,
+        )?;
 
-                        println!(
-                            "Cell has pawn {:?} with frame {:?}",
-                            pawn.bot_id, pawn.frame
-                        );
-                        pawn.frame == FrameKind::Building(BuildingKind::Small)
-                    })
-                else {
-                    info!(self, "In idle state, no base found, waiting");
-                    return Wait;
-                };
-                info!(self, "Found base at {:?}", target);
-                *state = GathererState::Gathering { base: target };
-                self.gatherer_behavior(state, update)
-            }
-            GathererState::Gathering { base } => {
-                self.ensure_energy(bot)?;
+        self.wait_for_in_progress_action(&update.in_progress_action)?;
 
-                self.wait_for_in_progress_action(&update.in_progress_action)?;
+        self.gather(bot, &state.base)?;
 
-                self.gather(bot, base)?;
-
-                self.explore(bot, 1000)
-            }
-        }
+        self.explore(bot, 1000)
     }
 
     fn gather(&mut self, bot: &BotData, base: &Pos) -> DecisionResult {
@@ -350,41 +460,37 @@ impl EconBot {
         Continue
     }
 
+    fn init_explorer_state(update: &BotUpdate) -> ExplorerState {
+        let base = Self::find_base(&update.bot_data).expect("No base found");
+        ExplorerState {
+            last_shared_map_tick: update.tick,
+            base,
+        }
+    }
+
     fn explorer_behavior(
         &mut self,
         state: &mut ExplorerState,
         update: &BotUpdate,
     ) -> DecisionResult {
         let bot = &update.bot_data;
-        match state {
-            ExplorerState::Idle => {
-                info!(self, "Explorer is idle");
-                Wait
-            }
-            ExplorerState::Exploring { base } => {
-                self.ensure_energy(bot)?;
-                self.wait_for_in_progress_action(&update.in_progress_action)?;
-                self.explore(bot, 1000)?;
+        self.ensure_energy(bot)?;
+        self.wait_for_in_progress_action(&update.in_progress_action)?;
+        self.explore(bot, 1000)?;
 
-                // Return to base
-                let distance = bot.pos.manhattan_distance(base);
-                if distance > 10 {
-                    info!(
-                        self,
-                        "Explorer has nothing to do, returning to base ",
-                    );
-                    if let Some(path) =
-                        bot.known_map.find_path_adj(bot.pos, *base)
-                    {
-                        return Act(
-                            Action::MoveTo(path),
-                            "Nothing to explore, returning to base",
-                        );
-                    }
-                }
-                Wait
+        // Return to base
+        let distance = bot.pos.manhattan_distance(&state.base);
+        if distance > 10 {
+            info!(self, "Explorer has nothing to do, returning to base ",);
+            if let Some(path) = bot.known_map.find_path_adj(bot.pos, state.base)
+            {
+                return Act(
+                    Action::MoveTo(path),
+                    "Nothing to explore, returning to base",
+                );
             }
         }
+        Wait
     }
 
     fn explore(
@@ -409,27 +515,27 @@ impl EconBot {
     }
 
     fn ensure_energy(&mut self, bot: &BotData) -> DecisionResult {
-        let base = match self
+        let base_pos = match self
             .find_bot(bot, 1000, |b| b.subsystems.has(Subsystem::Generator))
         {
-            Some((base, _)) => base,
+            Some(base) => base.pos,
             None => {
-                let Some((base, _)) = self.find_bot(bot, 1000, |b| {
+                let Some(base) = self.find_bot(bot, 1000, |b| {
                     b.frame == FrameKind::Building(BuildingKind::Small)
                 }) else {
                     info!(self, "No recharge base found, continuing");
                     return Continue;
                 };
-                base
+                base.pos
             }
         };
 
         let energy_level = bot.energy.0;
         let max_energy = bot.max_energy().0;
-        let distance_to_base = bot.pos.manhattan_distance(&base);
+        let distance_to_base = bot.pos.manhattan_distance(&base_pos);
 
         if energy_level < max_energy {
-            if let Some(dir) = bot.pos.dir_to(&base) {
+            if let Some(dir) = bot.pos.dir_to(&base_pos) {
                 info!(
                     self,
                     "Adjacent to base, recharging. Energy: {}/{}",
@@ -453,7 +559,7 @@ impl EconBot {
                 );
                 return self.move_and_act(
                     bot,
-                    base,
+                    base_pos,
                     Action::Recharge,
                     "Returning to base to recharge",
                 );
@@ -461,6 +567,31 @@ impl EconBot {
         }
 
         Continue
+    }
+
+    fn decide_pawn_map_sharing(
+        &mut self,
+        last_shared_map_tick: &mut u32,
+        base_pos: &Pos,
+        update: &BotUpdate,
+    ) -> DecisionResult {
+        // If map shared recently, don't share
+        if update.tick - *last_shared_map_tick < 30 {
+            return Continue;
+        }
+
+        // If the bot is not in range of base, don't share
+        if update.bot_data.pos.manhattan_distance(base_pos) > 5 {
+            return Continue;
+        }
+
+        let base_cell = update.bot_data.known_map.get(*base_pos);
+        let base_id = base_cell.pawn.expect("Base cell has no pawn");
+
+        // Update last shared map
+        *last_shared_map_tick = update.tick;
+
+        Act(Action::ShareMap { with: base_id }, "Sharing map with base")
     }
 
     fn move_and_act(
@@ -514,27 +645,26 @@ impl EconBot {
         bot: &'a BotData,
         max_distance: usize,
         pred: impl Fn(&'a ClientBotData) -> bool,
-    ) -> Option<(Pos, &'a ClientBotData)> {
+    ) -> Option<&'a ClientBotData> {
         let mut found = None;
-        bot.known_map
-            .find_nearby(bot.pos, max_distance, |cell| {
-                //
-                let Some(pawn_id) = cell.pawn else {
-                    return false;
-                };
-                let Some(pawn) =
-                    bot.known_bots.iter().find(|b| b.bot_id == pawn_id)
-                else {
-                    return false;
-                };
-                if pred(pawn) {
-                    found = Some(pawn);
-                    true
-                } else {
-                    false
-                }
-            })
-            .map(|(pos, _)| (pos, found.unwrap()))
+        bot.known_map.find_nearby(bot.pos, max_distance, |cell| {
+            //
+            let Some(pawn_id) = cell.pawn else {
+                return false;
+            };
+            let Some(pawn) =
+                bot.known_bots.iter().find(|b| b.bot_id == pawn_id)
+            else {
+                return false;
+            };
+            if pred(pawn) {
+                found = Some(pawn);
+                true
+            } else {
+                false
+            }
+        });
+        found
     }
 }
 

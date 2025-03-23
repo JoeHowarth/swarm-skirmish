@@ -12,6 +12,7 @@ use swarm_lib::{
     Item,
 };
 
+use super::bot_update::BotIdToEntity;
 use crate::{
     game::bot_update::BotId,
     types::{GridWorld, PartiallyBuiltBot, Tick},
@@ -62,6 +63,7 @@ impl Plugin for ActionsPlugin {
 
 fn validate_actions(
     tick: Res<Tick>,
+    bot_id_to_entity: Res<BotIdToEntity>,
     mut query: Query<(
         Entity,
         &BotId,
@@ -88,6 +90,7 @@ fn validate_actions(
             &grid_world,
             bot_data,
             get_bot_data,
+            &bot_id_to_entity,
             &partially_built_bots,
         ) {
             entities_with_invalid_action.push((entity, status));
@@ -123,6 +126,7 @@ fn is_action_invalid<'a>(
     grid_world: &GridWorld,
     bot_data: &BotData,
     get_bot_data: impl Fn(Entity) -> &'a BotData,
+    bot_id_to_entity: &BotIdToEntity,
     partially_built_bots: &Query<&PartiallyBuiltBot>,
 ) -> std::result::Result<(), String> {
     if bot_data.energy < kind.energy_per_tick() {
@@ -314,6 +318,30 @@ fn is_action_invalid<'a>(
                 return Err("Invalid Attack: Target is on same team".into());
             }
         }
+        Action::Msg { to, .. } => {
+            let to_e = bot_id_to_entity.to_entity(BotId(*to));
+            let to_data = get_bot_data(to_e);
+            if to_data.team != bot_data.team {
+                return Err("Invalid Msg: Target is on different team".into());
+            }
+
+            if to_data.pos.manhattan_distance(&bot_data.pos) > 10 {
+                return Err("Invalid Msg: Target is too far away".into());
+            }
+        }
+        Action::ShareMap { with } => {
+            let to_e = bot_id_to_entity.to_entity(BotId(*with));
+            let to_data = get_bot_data(to_e);
+            if to_data.team != bot_data.team {
+                return Err(
+                    "Invalid ShareMap: Target is on different team".into()
+                );
+            }
+
+            if to_data.pos.manhattan_distance(&bot_data.pos) > 5 {
+                return Err("Invalid ShareMap: Target is too far away".into());
+            }
+        }
     }
     Ok(())
 }
@@ -349,6 +377,7 @@ fn validate_target_pos(
 fn apply_actions(
     mut commands: Commands,
     tick: Res<Tick>,
+    bot_id_to_entity: Res<BotIdToEntity>,
     mut query: Query<(
         Entity,
         &BotId,
@@ -361,6 +390,7 @@ fn apply_actions(
 ) {
     let mut transfers = Vec::new();
     let mut recharge_subtractions = Vec::new();
+    let mut msgs = Vec::new();
     for (entity, bot_id, mut bot_data, mut current_action, mut past_actions) in
         query.iter_mut()
     {
@@ -383,6 +413,7 @@ fn apply_actions(
             &mut bot_data,
             &mut grid_world,
             &mut transfers,
+            &mut msgs,
             &mut recharge_subtractions,
             &mut commands,
             &mut partially_built_bots,
@@ -417,6 +448,24 @@ fn apply_actions(
         let bot = &mut query.get_mut(pawn).unwrap().2;
         bot.energy.0 -= energy.0;
     }
+
+    for (msg, from) in msgs {
+        match msg {
+            Action::Msg { msg, to } => {
+                let to_e = bot_id_to_entity.to_entity(BotId(to));
+                let bot = &mut query.get_mut(to_e).unwrap().2;
+                bot.msg_buffer.push((msg, from.0));
+            }
+            Action::ShareMap { with } => {
+                let from_e = bot_id_to_entity.to_entity(from);
+                let to_e = bot_id_to_entity.to_entity(BotId(with));
+                let [to_bot, from_bot] = query.get_many_mut([to_e, from_e]).unwrap();
+                let [mut to_bot, from_bot] = [to_bot.2, from_bot.2];
+                to_bot.known_map.update_from(&from_bot.known_map, from.0);
+            }
+            _ => unreachable!(),
+        }
+    }
 }
 
 fn apply_action_inner(
@@ -427,6 +476,7 @@ fn apply_action_inner(
     bot: &mut BotData,
     grid_world: &mut GridWorld,
     transfers: &mut Vec<(Entity, Item)>,
+    msgs: &mut Vec<(Action, BotId)>,
     recharge_subtractions: &mut Vec<(Entity, Energy)>,
     commands: &mut Commands,
     partially_built_bots: &mut Query<&mut PartiallyBuiltBot>,
@@ -587,6 +637,20 @@ fn apply_action_inner(
             Some(ActionStatus::Success)
         }
         Action::Attack(_dir) => todo!(),
+        Action::Msg { msg, to } => {
+            msgs.push((
+                Action::Msg {
+                    msg: msg.clone(),
+                    to: *to,
+                },
+                *bot_id,
+            ));
+            Some(ActionStatus::Success)
+        }
+        Action::ShareMap { with } => {
+            msgs.push((Action::ShareMap { with: *with }, *bot_id));
+            Some(ActionStatus::Success)
+        }
     }
 }
 

@@ -63,6 +63,8 @@ impl Plugin for ReplayPlugin {
                     next_state.set(GameState::InGame);
                 },
             );
+            // Set the tick to 1 so that the bots don't start at 0
+            app.insert_resource(Tick(1));
             app.insert_resource(MapSize {
                 x: replay.ticks[0].grid_world.width() as u32,
                 y: replay.ticks[0].grid_world.height() as u32,
@@ -208,10 +210,11 @@ fn restore_replay_at_tick(
     mut replay_entity_to_live_entity: ResMut<ReplayEntityToLiveEntity>,
     mut grid_world: ResMut<GridWorld>,
 ) {
-    let Some(tick_data) = replay.ticks.get(tick.0 as usize) else {
+    let Some(tick_data) = replay.ticks.get(tick.0 as usize - 1) else {
         warn!("No tick data found for tick {}", tick.0);
         return;
     };
+    assert_eq!(tick_data.tick, tick.0);
     for (bot_id, components) in tick_data.bot_data.iter() {
         // Look up the entity in the replay. This may or may not be the same as
         // the entity in *this* bevy world

@@ -218,15 +218,15 @@ fn update_bots(
                 }
                 Action::Recharge(_dir) => ActionState::None,
                 Action::Attack(_dir) => ActionState::None,
+                Action::Msg { .. } => ActionState::None,
+                Action::ShareMap { .. } => ActionState::None,
             },
             kind: action.action,
             id: action.id,
         };
 
         // If there is a current action already, cancel it
-        if let Some(action) =
-            current_action.0.replace(action_container)
-        {
+        if let Some(action) = current_action.0.replace(action_container) {
             past_actions.push(ActionResult {
                 action: action.kind,
                 id: action.id,
