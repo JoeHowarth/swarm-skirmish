@@ -61,17 +61,10 @@ impl CellState {
         }
     }
 
-    #[allow(dead_code)]
-    pub fn new_with_item(item: Item) -> CellState {
-        CellState {
-            kind: CellKind::Empty,
-            item: Some(item),
-            ..default()
-        }
-    }
-
     pub fn can_enter(&self) -> bool {
-        self.kind == CellKind::Empty && self.pawn.is_none()
+        self.kind == CellKind::Empty
+            && self.pawn.is_none()
+            && self.partially_built_bot.is_none()
     }
 
     pub fn from_client_state(

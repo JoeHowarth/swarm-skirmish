@@ -143,7 +143,7 @@ pub(super) fn init_econ_loop(mut commands: Commands, level_args: Res<Levels>) {
     }
 
     // Place metal items
-    for _ in 0..20.min(width * height / 20) {
+    for _ in 0..(width * height / 20) {
         let (x, y) = find_empty_cell(&grid_world);
         grid_world.get_tuple_mut(x, y).item = Some(Item::Metal);
     }

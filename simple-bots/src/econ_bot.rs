@@ -7,6 +7,8 @@ use swarm_lib::{
     gridworld::PassableCell,
     known_map::{ClientBotData, KnownMap},
     Action,
+    ActionResult,
+    ActionStatus,
     ActionWithId,
     Bot,
     BotData,
@@ -46,12 +48,14 @@ pub struct BaseState {
 pub struct GathererState {
     pub last_shared_map_tick: u32,
     pub base: Pos,
+    pub change_recharge_target_cooldown: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExplorerState {
     pub last_shared_map_tick: u32,
     pub base: Pos,
+    pub change_recharge_target_cooldown: u32,
 }
 
 pub struct EconBot {
@@ -154,11 +158,11 @@ impl EconBot {
             bot.energy.0
         );
 
-        if bot.energy.0 < 10 && !bot.subsystems.has(Subsystem::Generator) {
-            if let Some(bot) = self
+        if bot.energy.0 < 150 && !bot.subsystems.has(Subsystem::Generator) {
+            if let Some(found_bot) = self
                 .find_bot(bot, 1, |b| b.subsystems.has(Subsystem::Generator))
             {
-                let dir = bot.pos.dir_to(&bot.pos).unwrap();
+                let dir = bot.pos.dir_to(&found_bot.pos).unwrap();
                 return Act(Action::Recharge(dir), "Recharging");
             }
         }
@@ -186,9 +190,14 @@ impl EconBot {
                      bay",
                     bot.inventory.get(Item::Metal)
                 );
+                let Some(dir) = Self::find_open_cell(&bot) else {
+                    info!(self, "No valid direction to build flea");
+                    return Wait;
+                };
+
                 return Act(
                     Action::Build(
-                        Dir::Up,
+                        dir,
                         FrameKind::Flea,
                         Subsystems::new([(Subsystem::CargoBay, 1)]),
                     ),
@@ -217,9 +226,7 @@ impl EconBot {
                      with generator",
                     bot.inventory.get(Item::Metal)
                 );
-                let Some(dir) =
-                    bot.known_map.find_adj(bot.pos, |cell| !cell.is_blocked())
-                else {
+                let Some(dir) = Self::find_open_cell(&bot) else {
                     info!(self, "No valid direction to build generator");
                     return Wait;
                 };
@@ -247,9 +254,14 @@ impl EconBot {
                  bay and power cell",
                 bot.inventory.get(Item::Metal)
             );
+            let Some(dir) = Self::find_open_cell(&bot) else {
+                info!(self, "No valid direction to build tractor");
+                return Wait;
+            };
+
             return Act(
                 Action::Build(
-                    Dir::Up,
+                    dir,
                     FrameKind::Tractor,
                     Subsystems::new([
                         (Subsystem::CargoBay, 4),
@@ -266,6 +278,10 @@ impl EconBot {
             bot.inventory.get(Item::Metal)
         );
         Wait
+    }
+
+    fn find_open_cell(bot: &BotData) -> Option<Dir> {
+        bot.known_map.find_adj(bot.pos, |cell| !cell.is_blocked())
     }
 
     fn decide_base_map_sharing(
@@ -324,6 +340,7 @@ impl EconBot {
         GathererState {
             last_shared_map_tick: update.tick,
             base: target,
+            change_recharge_target_cooldown: 10,
         }
     }
 
@@ -356,7 +373,11 @@ impl EconBot {
     ) -> DecisionResult {
         let bot = &update.bot_data;
 
-        self.ensure_energy(bot)?;
+        self.ensure_energy(
+            &mut state.change_recharge_target_cooldown,
+            bot,
+            &update.completed_action,
+        )?;
 
         self.decide_pawn_map_sharing(
             &mut state.last_shared_map_tick,
@@ -436,6 +457,7 @@ impl EconBot {
         ExplorerState {
             last_shared_map_tick: update.tick,
             base,
+            change_recharge_target_cooldown: 10,
         }
     }
 
@@ -445,7 +467,11 @@ impl EconBot {
         update: &BotUpdate,
     ) -> DecisionResult {
         let bot = &update.bot_data;
-        self.ensure_energy(bot)?;
+        self.ensure_energy(
+            &mut state.change_recharge_target_cooldown,
+            bot,
+            &update.completed_action,
+        )?;
         self.wait_for_in_progress_action(&update.in_progress_action)?;
         self.explore(bot, 1000)?;
 
@@ -485,10 +511,36 @@ impl EconBot {
         Continue
     }
 
-    fn ensure_energy(&mut self, bot: &BotData) -> DecisionResult {
-        let base_pos = match self
-            .find_bot(bot, 1000, |b| b.subsystems.has(Subsystem::Generator))
+    fn ensure_energy(
+        &mut self,
+        change_recharge_target_cooldown: &mut u32,
+        bot: &BotData,
+        completed_action: &Option<ActionResult>,
+    ) -> DecisionResult {
+        let mut failed_pos = None;
+        if let Some(ActionResult {
+            action: Action::Recharge(dir),
+            status: ActionStatus::Failure(_failure_reason),
+            ..
+        }) = completed_action
         {
+            failed_pos = bot.pos + *dir;
+            if *change_recharge_target_cooldown > 0 {
+                *change_recharge_target_cooldown -= 1;
+                info!(
+                    self,
+                    "Recharge target cooldown: {}, waiting for it to reset",
+                    *change_recharge_target_cooldown
+                );
+                return Wait;
+            } else {
+                *change_recharge_target_cooldown = 10;
+            }
+        }
+
+        let base_pos = match self.find_bot(bot, 1000, |b| {
+            b.subsystems.has(Subsystem::Generator) && Some(b.pos) != failed_pos
+        }) {
             Some(base) => base.pos,
             None => {
                 let Some(base) = self.find_bot(bot, 1000, |b| {

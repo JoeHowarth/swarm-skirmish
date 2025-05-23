@@ -221,6 +221,15 @@ fn restore_replay_at_tick(
         let cell = tick_data.grid_world.get(components.bot_data.pos);
         let replay_entity = cell.pawn.unwrap();
 
+        if bot_id.0 == 5 {
+            info!(
+                "Replay entity: {}, bot ID: {}, mapped entity: {:?}",
+                replay_entity,
+                bot_id.0,
+                bot_id_to_entity.0.get(bot_id)
+            );
+        }
+
         // If the entity exists in this bevy world, update the bot data
         let entity = bot_id_to_entity.0.get(bot_id);
         if let Some((
@@ -230,15 +239,37 @@ fn restore_replay_at_tick(
             mut bot_logs,
         )) = entity.and_then(|entity| bots.get_mut(*entity).ok())
         {
+            if replay_entity_to_live_entity.0.get(&replay_entity) != entity {
+                info!(
+                    "Replay entity {} should map to live entity {}. Bot ID: \
+                     {}. Tick: {}, replay entity to live entity: {:?}",
+                    replay_entity,
+                    entity.unwrap(),
+                    bot_id.0,
+                    tick.0,
+                    replay_entity_to_live_entity.0
+                );
+                for (replay_entity, live_entity) in
+                    replay_entity_to_live_entity.0.iter()
+                {
+                    info!(
+                        "Replay entity: {}, live entity: {}",
+                        replay_entity, live_entity,
+                    );
+                }
+            }
             // Make sure the entity in the replay is mapped correctly to the
             // entity in this bevy world
             assert_eq!(
                 replay_entity_to_live_entity.0.get(&replay_entity),
                 entity,
-                "Replay entity {} should map to live entity {}. Bot ID: {}",
+                "Replay entity {} should map to live entity {}. Bot ID: {}. \
+                 Tick: {}, replay entity to live entity: {:?}",
                 replay_entity,
                 entity.unwrap(),
-                bot_id.0
+                bot_id.0,
+                tick.0,
+                replay_entity_to_live_entity.0
             );
             *bot_data = components.bot_data.clone();
             current_action.0 = components.current_action.0.clone();
@@ -247,13 +278,32 @@ fn restore_replay_at_tick(
             continue;
         }
 
+        if bot_id.0 == 5 {
+            info!("Bot ID: {}", bot_id.0);
+            // info!("Pos: {:?}", components.bot_data.pos);
+            // info!("Current action: {:?}", components.current_action.0);
+            // info!("Past actions: {:?}", components.past_actions.0);
+            // info!("Bot logs: {:?}", components.bot_logs.0);
+            info!(
+                "Replay entity to live entity: {:?}",
+                replay_entity_to_live_entity.0
+            );
+        }
+
         // If the entity doesn't exist in this bevy world, spawn a new one
         let live_entity = commands.spawn(components.clone()).id();
 
         // Map the replay entity to the live entity
-        replay_entity_to_live_entity
+        if let Some(replaced) = replay_entity_to_live_entity
             .0
-            .insert(replay_entity, live_entity);
+            .insert(replay_entity, live_entity)
+        {
+            warn!(
+                "Replaced entity {} with entity {} in top loop, for replay \
+                 entity {}",
+                replaced, live_entity, replay_entity
+            );
+        }
     }
 
     // Create partially built bots
@@ -272,9 +322,16 @@ fn restore_replay_at_tick(
         let live_entity = commands.spawn(partial.clone()).id();
 
         // Map the replay entity to the live entity
-        replay_entity_to_live_entity
+        if let Some(replaced) = replay_entity_to_live_entity
             .0
-            .insert(*replay_entity, live_entity);
+            .insert(*replay_entity, live_entity)
+        {
+            warn!(
+                "Replaced entity {} with entity {} in bottom loop, for replay \
+                 entity {}",
+                replaced, live_entity, replay_entity
+            );
+        }
     }
 
     // Update the grid world

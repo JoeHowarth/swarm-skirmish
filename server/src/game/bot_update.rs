@@ -76,16 +76,22 @@ impl Plugin for BotUpdatePlugin {
             .register_component_hooks::<BotData>()
             .on_add(|mut world, entity, _| {
                 // Get the bot ID from the entity or create a new one
+                debug!("Getting bot ID for entity: {}", entity.index());
                 let bot_id = world
                     .entity(entity)
                     .get::<BotId>()
                     .cloned()
                     .unwrap_or_else(|| {
+                        debug!(
+                            "Creating new bot ID for entity: {}",
+                            entity.index()
+                        );
                         let mut next_bot_id = world.resource_mut::<NextBotId>();
                         let bot_id = BotId(next_bot_id.0);
                         next_bot_id.0 += 1;
                         bot_id
                     });
+                debug!("Bot ID: {}, Entity: {}", bot_id.0, entity.index());
 
                 // Insert the bot ID -> Entity mapping
                 world

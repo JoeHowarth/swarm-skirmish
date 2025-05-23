@@ -151,7 +151,7 @@ fn handle_tick_controls(
         println!("Decreased tick speed to {}", tick_speed.ms);
     }
     if keys.just_pressed(KeyCode::BracketRight) {
-        tick_speed.ms = ((tick_speed.ms as f64 * 3. / 4.) as u64).max(50);
+        tick_speed.ms = ((tick_speed.ms as f64 * 3. / 4.) as u64).max(5);
         println!("Increased tick speed to {}", tick_speed.ms);
     }
 

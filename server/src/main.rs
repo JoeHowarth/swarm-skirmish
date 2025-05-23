@@ -184,21 +184,6 @@ pub fn camera_setup(mut commands: Commands) {
             ..default()
         },
     ));
-
-    commands.spawn((
-        Text::new("Main Text"),
-        TextColor(css::RED.into()),
-        Node {
-            position_type: PositionType::Absolute,
-            right: Val::Px(0.0),
-            top: Val::Px(0.0),
-            ..default()
-        },
-        TextFont {
-            font_size: 20.0,
-            ..default()
-        },
-    ));
 }
 
 pub fn exit_system(

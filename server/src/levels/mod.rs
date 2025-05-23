@@ -92,4 +92,4 @@ fn transition_to_in_game(mut next_state: ResMut<NextState<GameState>>) {
     FromArgs, Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq,
 )]
 #[argh(subcommand, name = "replay", description = "Replay a game")]
-struct ReplayArgs {}
+pub struct ReplayArgs {}

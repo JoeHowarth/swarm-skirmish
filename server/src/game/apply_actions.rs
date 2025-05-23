@@ -446,7 +446,7 @@ fn apply_actions(
 
     for (pawn, energy) in recharge_subtractions {
         let bot = &mut query.get_mut(pawn).unwrap().2;
-        bot.energy.0 -= energy.0;
+        bot.energy.0 = bot.energy.0.saturating_sub(energy.0);
     }
 
     for (msg, from) in msgs {
@@ -459,7 +459,8 @@ fn apply_actions(
             Action::ShareMap { with } => {
                 let from_e = bot_id_to_entity.to_entity(from);
                 let to_e = bot_id_to_entity.to_entity(BotId(with));
-                let [to_bot, from_bot] = query.get_many_mut([to_e, from_e]).unwrap();
+                let [to_bot, from_bot] =
+                    query.get_many_mut([to_e, from_e]).unwrap();
                 let [mut to_bot, from_bot] = [to_bot.2, from_bot.2];
                 to_bot.known_map.update_from(&from_bot.known_map, from.0);
             }

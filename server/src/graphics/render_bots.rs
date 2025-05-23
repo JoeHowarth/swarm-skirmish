@@ -43,11 +43,11 @@ impl Plugin for RenderBotsPlugin {
 
 fn ensure_bot_sprite(
     mut commands: Commands,
-    bots: Query<(Entity, &BotData), Without<Sprite>>,
+    bots: Query<(Entity, &BotData, &BotId), Without<Sprite>>,
     textures: Res<Textures>,
     tilemap_coords: Res<TilemapWorldCoords>,
 ) {
-    for (entity, bot_data) in bots.iter() {
+    for (entity, bot_data, bot_id) in bots.iter() {
         commands
             .entity(entity)
             .insert((
@@ -91,7 +91,7 @@ fn ensure_bot_sprite(
             .with_children(|parent| {
                 parent.spawn((
                     Text2d::new("<Action Reason>"),
-                    TextColor(css::ANTIQUE_WHITE.into()),
+                    TextColor(css::BLACK.into()),
                     TextFont {
                         font_size: 12.0,
                         ..default()
@@ -103,16 +103,27 @@ fn ensure_bot_sprite(
                     Transform::from_translation(Vec3::new(0.0, 20.0, 20.0)),
                 ));
                 parent.spawn((
-                    Text2d::new("E <Energy>"),
-                    TextColor(css::ANTIQUE_WHITE.into()),
+                    Text2d::new(format!("Bot ID {}", bot_id.0)),
+                    TextColor(css::BLACK.into()),
                     TextFont {
-                        font_size: 12.0,
+                        font_size: 16.0,
+                        ..default()
+                    },
+                    TextLayout::new(JustifyText::Left, LineBreak::WordBoundary),
+                    TextBounds::from(Vec2::new(100.0, 20.0)),
+                    Transform::from_translation(Vec3::new(-40.0, 0., 20.0)),
+                ));
+                parent.spawn((
+                    Text2d::new("E <Energy>"),
+                    TextColor(css::BLACK.into()),
+                    TextFont {
+                        font_size: 16.0,
                         ..default()
                     },
                     BotLabel::Energy,
                     TextLayout::new(JustifyText::Left, LineBreak::WordBoundary),
                     TextBounds::from(Vec2::new(50.0, 20.0)),
-                    Transform::from_translation(Vec3::new(-40.0, 0., 20.0)),
+                    Transform::from_translation(Vec3::new(-40.0, -20., 20.0)),
                 ));
             });
     }
@@ -217,13 +228,9 @@ fn render_bots(
 
                 let (action_str, energy_str) = if bot_e == entity {
                     (
-                        get_reason(
-                            &current_tick,
-                            current_action,
-                            past_actions,
-                        )
-                        .unwrap_or_default()
-                        .to_owned(),
+                        get_reason(&current_tick, current_action, past_actions)
+                            .unwrap_or_default()
+                            .to_owned(),
                         format!("E: {}", bot_data.energy.0),
                     )
                 } else {

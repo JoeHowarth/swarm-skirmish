@@ -212,7 +212,7 @@ impl BotLogger {
         let _ = handle.flush();
 
         // Clear the buffer
-        
+
         std::mem::take(&mut self.buffer)
     }
 
