@@ -56,7 +56,7 @@ impl<
         if self.size() - curr + count > self.capacity {
             false
         } else {
-            self.items_table[item.into() as usize] = curr + count;
+            self.items_table[item.into() as usize] = count;
             true
         }
     }
@@ -87,7 +87,7 @@ impl<
         }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (T, u8)> + use<'_, N, T> {
+    pub fn iter(&self) -> impl Iterator<Item = (T, u8)> + '_ {
         self.items_table
             .iter()
             .enumerate()
