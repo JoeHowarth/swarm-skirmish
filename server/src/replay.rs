@@ -129,6 +129,9 @@ fn load_replay(path: &str) -> Replay {
 }
 
 fn save_replay(replay: Res<Replay>) {
+    // Create the replay directory if it doesn't exist
+    std::fs::create_dir_all("replays").unwrap();
+
     let file = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
